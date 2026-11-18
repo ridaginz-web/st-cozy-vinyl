@@ -12,6 +12,8 @@
     quietVolume: 0.3,
     autoSpin: true,
     compactMode: false,
+    cozyMascot: true,
+    favorites: [],
     theme: "glass"
   };
 
@@ -22,6 +24,16 @@
     storm: "⛈️ Дождь и гроза",
     fire: "🔥 Треск костра",
     fireflies: "✨ Светлячки"
+  };
+
+  const THEME_DRINKS = {
+    latte: "☕",
+    pink: "🌸",
+    dark: "☕",
+    matcha: "🍵",
+    glass: "☕",
+    noir: "🍷",
+    neon: "🍸"
   };
 
   const THEME_CLASSES = [
@@ -157,15 +169,33 @@
     for (const k of Object.keys(defaultSettings)) {
       if (s[k] === undefined) s[k] = defaultSettings[k];
     }
+    if (!Array.isArray(s.favorites)) s.favorites = [];
     return s;
   }
 
+  function makeFavKey(title = "", artist = "") {
+    return `${String(title).trim().toLowerCase()}|${String(artist).trim().toLowerCase()}`;
+  }
+
+  function isTrackFavorited(title, artist) {
+    const s = getSettings();
+    const key = makeFavKey(title, artist);
+    return s.favorites.some(f => makeFavKey(f.title, f.artist) === key);
+  }
+
   function applyTheme() {
-    const { theme } = getSettings();
+    const s = getSettings();
     document.body.classList.remove(...THEME_CLASSES);
-    if (theme && theme !== "latte") {
-      document.body.classList.add(`st-vinyl-theme-${theme}`);
+    if (s.theme && s.theme !== "latte") {
+      document.body.classList.add(`st-vinyl-theme-${s.theme}`);
     }
+    document.body.classList.toggle("st-vinyl-hide-mascot", s.cozyMascot === false);
+
+    // Обновляем иконку напитка в чашке под выбранную тему
+    const drinkIcon = THEME_DRINKS[s.theme] || "☕";
+    document.querySelectorAll(".st-vinyl-cup-icon").forEach(el => {
+      el.textContent = drinkIcon;
+    });
   }
 
   function updatePrompt() {
@@ -175,7 +205,6 @@
     ctx.setExtensionPrompt(PROMPT_KEY, enabled ? DEFAULT_PROMPT : "", 1, 0);
   }
 
-  // Определение режима звука по тексту плашки вайба или контексту карточки
   function detectSoundMode(vibeText = "", extraText = "") {
     const v = String(vibeText).toLowerCase();
     if (/гроз|гром|молн|шторм|буря|storm|thunder|⛈|⚡/.test(v)) return "storm";
@@ -207,7 +236,7 @@
     return card.dataset.sound || fromBadge || "lofi";
   }
 
-  // Атмосферный звуковой движок (с разблокировкой звука на iOS / Android и чёткой слышимостью на динамике телефона)
+  // Атмосферный звуковой движок
   let audioCtx = null;
   let stopAudioFn = null;
   let currentMasterGain = null;
@@ -260,11 +289,94 @@
     return Math.max(0.05, Math.min(1, raw)) * 1.45;
   }
 
+  // 🐾 Мягкое мурчание котика при поглаживании (клике по котику)
+  function playCatPurr() {
+    const s = getSettings();
+    if (!s.sound) return;
+    const ctx = unlockAudioEngine();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = Math.min(0.65, getMasterVolume() * 0.75);
+    master.connect(ctx.destination);
+
+    // Бархатистое вибро-мурчание
+    const carrier = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    const purrFilter = ctx.createBiquadFilter();
+    const purrGain = ctx.createGain();
+
+    carrier.type = "triangle";
+    carrier.frequency.setValueAtTime(52, now);
+    carrier.frequency.linearRampToValueAtTime(64, now + 0.35);
+    carrier.frequency.linearRampToValueAtTime(48, now + 0.85);
+
+    lfo.type = "sine";
+    lfo.frequency.value = 24;
+    lfoGain.gain.value = 18;
+
+    purrFilter.type = "lowpass";
+    purrFilter.frequency.value = 220;
+
+    purrGain.gain.setValueAtTime(0.001, now);
+    purrGain.gain.linearRampToValueAtTime(0.24, now + 0.12);
+    purrGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(carrier.frequency);
+    carrier.connect(purrFilter);
+    purrFilter.connect(purrGain);
+    purrGain.connect(master);
+
+    carrier.start(now);
+    lfo.start(now);
+    carrier.stop(now + 0.92);
+    lfo.stop(now + 0.92);
+
+    // Нежный колокольчик-мяу поверх мурчания
+    const meow = ctx.createOscillator();
+    const meowGain = ctx.createGain();
+    meow.type = "sine";
+    meow.frequency.setValueAtTime(580, now + 0.08);
+    meow.frequency.exponentialRampToValueAtTime(760, now + 0.22);
+    meow.frequency.exponentialRampToValueAtTime(510, now + 0.55);
+    meowGain.gain.setValueAtTime(0.001, now + 0.08);
+    meowGain.gain.linearRampToValueAtTime(0.09, now + 0.16);
+    meowGain.gain.exponentialRampToValueAtTime(0.0008, now + 0.58);
+    meow.connect(meowGain);
+    meowGain.connect(master);
+    meow.start(now + 0.08);
+    meow.stop(now + 0.6);
+  }
+
+  // 🎚️ Винтажный звук плавной остановки моторчика пластинки при паузе
+  function playVinylSpinDown() {
+    const s = getSettings();
+    if (!s.sound || !audioCtx) return;
+    try {
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(155, now);
+      osc.frequency.exponentialRampToValueAtTime(34, now + 0.38);
+      g.gain.setValueAtTime(0.12 * Math.min(1, getMasterVolume()), now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc.connect(g);
+      g.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.42);
+    } catch (e) {}
+  }
+
   function syncCardVisualState() {
     document.querySelectorAll(".st-vinyl-card").forEach((c) => {
       const label = c.querySelector(".st-vinyl-label");
       if (c === activeAudioCard) {
         c.classList.add("is-playing", "is-audio-on");
+        c.classList.remove("is-stopping");
         if (label) label.textContent = "🔊 NOW PLAYING";
       } else {
         c.classList.remove("is-audio-on");
@@ -272,13 +384,29 @@
           label.textContent = c.classList.contains("is-playing") ? "NOW PLAYING" : "PAUSED";
         }
       }
+
+      // Синхронизируем сердечко избранного
+      const favBtn = c.querySelector(".st-vinyl-fav-btn");
+      if (favBtn) {
+        const fav = isTrackFavorited(c.dataset.title || "", c.dataset.artist || "");
+        favBtn.classList.toggle("is-fav", fav);
+        favBtn.textContent = fav ? "♥" : "♡";
+      }
     });
   }
 
-  function stopVinylSound() {
+  function stopVinylSound(withSpinDown = false) {
+    const prevCard = activeAudioCard;
     if (stopAudioFn) {
       stopAudioFn();
       stopAudioFn = null;
+    }
+    if (withSpinDown) {
+      playVinylSpinDown();
+      if (prevCard) {
+        prevCard.classList.add("is-stopping");
+        setTimeout(() => prevCard.classList.remove("is-stopping"), 420);
+      }
     }
     currentMasterGain = null;
     activeAudioCard = null;
@@ -286,7 +414,7 @@
   }
 
   function startVinylSound(cardSoundMode = "lofi", cardEl = null) {
-    stopVinylSound();
+    stopVinylSound(false);
     const s = getSettings();
     if (!s.sound) return;
 
@@ -334,7 +462,6 @@
       return src;
     };
 
-    // Мягкий ламповый щелчок опускания иглы при старте
     const playNeedleDrop = () => {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
@@ -576,6 +703,9 @@
 
   const VINYL_REGEX = /\[vinyl:\s*([^|\]]+?)\s*\|\s*([^|\]]+?)\s*\|\s*([^|\]]+?)(?:\s*\|\s*([\s\S]+?))?\s*\](?!\s*—)/gi;
 
+  // SVG уютного котика на крышке виниловой деки
+  const CAT_SVG = `<svg viewBox="0 0 32 20" aria-hidden="true"><path class="st-cat-tail" d="M6 15 C2 14, 1 9, 4 7"/><g class="st-cat-body"><ellipse cx="15" cy="14" rx="8.5" ry="5"/><circle cx="23" cy="11" r="4.2"/><polygon points="20,8 21.2,3.5 23.8,7.2"/><polygon points="23.5,7.2 26.2,3.8 26.8,8.5"/></g></svg><span class="st-cat-zzz">zZz</span><span class="st-cat-heart">♥</span>`;
+
   function buildVinylHtml(title, artist, vibe, lyric, sound = "") {
     const s = getSettings();
     const cleanTitle = cleanTagField(title);
@@ -587,19 +717,64 @@
     const playClass = s.autoSpin ? "is-playing" : "";
     const compactClass = s.compactMode ? "is-compact" : "";
     const statusText = s.autoSpin ? "NOW PLAYING" : "PAUSED";
+    const fav = isTrackFavorited(cleanTitle, cleanArtist);
+    const drinkIcon = THEME_DRINKS[s.theme] || "☕";
+
     const t = escapeHtml(cleanTitle);
     const a = escapeHtml(cleanArtist);
     const v = escapeHtml(cleanVibe);
+    const lEsc = escapeHtml(cleanLyric);
 
-    // Бегущая строка автоматически включается для длинных названий
     const titleMarquee = cleanTitle.length > 26 ? "is-marquee" : "";
     const artistMarquee = cleanArtist.length > 32 ? "is-marquee" : "";
 
     const l = cleanLyric
-      ? `<div class="st-vinyl-wave"></div><div class="st-vinyl-lyric">«${escapeHtml(cleanLyric)}»</div>`
+      ? `<div class="st-vinyl-wave"></div><div class="st-vinyl-lyric">«${lEsc}»</div>`
       : "";
 
-    return `<div class="st-vinyl-card ${playClass} ${compactClass}" data-sound="${resolvedSound}" title="Нажми на пластинку для звука, на плашку вайба — для смены атмосферы, на кнопку [–] — чтобы свернуть"><div class="st-vinyl-fx"><span class="st-vinyl-ember e1"></span><span class="st-vinyl-ember e2"></span><span class="st-vinyl-ember e3"></span><span class="st-vinyl-firefly f1"></span><span class="st-vinyl-firefly f2"></span><span class="st-vinyl-firefly f3"></span></div><div class="st-vinyl-deck"><div class="st-vinyl-disc"></div><div class="st-vinyl-sheen"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-led"></div><div class="st-vinyl-notes"><span class="st-vinyl-note n1">♪</span><span class="st-vinyl-note n2">♫</span><span class="st-vinyl-note n3">✦</span></div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-actions"><span class="st-vinyl-vibe" title="Нажми, чтобы переключить атмосферу (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span><span class="st-vinyl-mini-btn" title="Свернуть / развернуть плеер">${s.compactMode ? "+" : "–"}</span></span></div><div class="st-vinyl-title-wrap"><div class="st-vinyl-title ${titleMarquee}">${t}</div></div><div class="st-vinyl-artist-wrap"><div class="st-vinyl-artist ${artistMarquee}">${a}</div></div>${l}</div></div>`;
+    return `<div class="st-vinyl-card ${playClass} ${compactClass}" data-sound="${resolvedSound}" data-title="${t}" data-artist="${a}" data-vibe="${v}" data-lyric="${lEsc}" title="Нажми на пластинку для звука, на котика — чтобы погладить, на плашку вайба — для смены погоды"><div class="st-vinyl-fx"><span class="st-vinyl-ember e1"></span><span class="st-vinyl-ember e2"></span><span class="st-vinyl-ember e3"></span><span class="st-vinyl-firefly f1"></span><span class="st-vinyl-firefly f2"></span><span class="st-vinyl-firefly f3"></span></div><div class="st-vinyl-deck"><div class="st-vinyl-cat" title="Погладить котика">${CAT_SVG}</div><div class="st-vinyl-disc"></div><div class="st-vinyl-sheen"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-led"></div><div class="st-vinyl-cup"><span class="st-vinyl-steam s1"></span><span class="st-vinyl-steam s2"></span><span class="st-vinyl-cup-icon">${drinkIcon}</span></div><div class="st-vinyl-notes"><span class="st-vinyl-note n1">♪</span><span class="st-vinyl-note n2">♫</span><span class="st-vinyl-note n3">✦</span></div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-actions"><span class="st-vinyl-vibe" title="Нажми, чтобы переключить атмосферу (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span><span class="st-vinyl-fav-btn ${fav ? "is-fav" : ""}" title="Сохранить пластинку в коллекцию">${fav ? "♥" : "♡"}</span><span class="st-vinyl-mini-btn" title="Свернуть / развернуть плеер">${s.compactMode ? "+" : "–"}</span></span></div><div class="st-vinyl-title-wrap"><div class="st-vinyl-title ${titleMarquee}">${t}</div></div><div class="st-vinyl-artist-wrap"><div class="st-vinyl-artist ${artistMarquee}">${a}</div></div>${l}</div></div>`;
+  }
+
+  function renderFavoritesShelf() {
+    const listEl = document.getElementById("st_vinyl_shelf_list");
+    const countEl = document.getElementById("st_vinyl_shelf_count");
+    if (!listEl) return;
+
+    const s = getSettings();
+    const favs = Array.isArray(s.favorites) ? s.favorites : [];
+    if (countEl) countEl.textContent = String(favs.length);
+
+    if (favs.length === 0) {
+      listEl.innerHTML = `<div class="st-vinyl-shelf-empty">Нажми <b>♡</b> на любой пластинке в чате, чтобы сохранить любимый трек и цитату на свою полку ✨</div>`;
+      return;
+    }
+
+    listEl.innerHTML = favs
+      .map(f => buildVinylHtml(f.title, f.artist, f.vibe || "🎹 Lo-Fi и винил", f.lyric || "", f.sound || ""))
+      .join("");
+  }
+
+  function toggleFavoriteFromCard(card) {
+    const s = getSettings();
+    const title = card.dataset.title || card.querySelector(".st-vinyl-title")?.textContent || "Unknown";
+    const artist = card.dataset.artist || card.querySelector(".st-vinyl-artist")?.textContent || "Unknown";
+    const vibe = card.querySelector(".st-vinyl-vibe")?.textContent || card.dataset.vibe || "🎹 Lo-Fi и винил";
+    const lyric = card.dataset.lyric || "";
+    const sound = resolveCardSound(card);
+
+    const key = makeFavKey(title, artist);
+    const idx = s.favorites.findIndex(f => makeFavKey(f.title, f.artist) === key);
+
+    if (idx >= 0) {
+      s.favorites.splice(idx, 1);
+    } else {
+      s.favorites.unshift({ title, artist, vibe, lyric, sound });
+    }
+
+    const ctx = window.SillyTavern?.getContext?.();
+    ctx?.saveSettingsDebounced?.();
+    syncCardVisualState();
+    renderFavoritesShelf();
   }
 
   function renderVinylInElement(el) {
@@ -722,12 +897,31 @@
     }
   }, { passive: true });
 
-  // Обработка кликов по плееру, плашке атмосферы и кнопке компактного режима
+  // Обработка кликов по котику, сердечку избранного, кнопке сворачивания, плашке вайба и пластинке
   document.addEventListener("click", (e) => {
     const card = e.target.closest?.(".st-vinyl-card");
     if (!card) return;
 
-    // 1. Кнопка сворачивания/разворачивания карточки [–] / [+]
+    // 1. Погладить котика на деке -> мурчание и сердечко
+    const catEl = e.target.closest(".st-vinyl-cat");
+    if (catEl) {
+      e.stopPropagation();
+      catEl.classList.remove("is-purring");
+      void catEl.offsetWidth;
+      catEl.classList.add("is-purring");
+      playCatPurr();
+      return;
+    }
+
+    // 2. Кнопка «В избранное» (♡ / ♥)
+    const favBtn = e.target.closest(".st-vinyl-fav-btn");
+    if (favBtn) {
+      e.stopPropagation();
+      toggleFavoriteFromCard(card);
+      return;
+    }
+
+    // 3. Кнопка сворачивания/разворачивания карточки (– / +)
     const miniBtn = e.target.closest(".st-vinyl-mini-btn");
     if (miniBtn) {
       e.stopPropagation();
@@ -738,7 +932,7 @@
 
     const s = getSettings();
 
-    // 2. Плашка вайба справа сверху — переключает звук И визуальный эффект карточки по кругу
+    // 4. Плашка вайба справа сверху — переключает звук И визуальный эффект карточки по кругу
     const vibeBadge = e.target.closest(".st-vinyl-vibe");
     if (vibeBadge) {
       e.stopPropagation();
@@ -756,21 +950,22 @@
 
     const soundToPlay = resolveCardSound(card);
 
-    // 3. Первый клик по пластинке сразу запускает звук
+    // 5. Первый клик по пластинке запускает звук
     if (activeAudioCard !== card) {
       if (!s.sound) {
         s.sound = true;
         const soundChk = document.getElementById("st_vinyl_sound");
         if (soundChk) soundChk.checked = true;
       }
+      card.classList.remove("is-stopping");
       card.classList.add("is-playing");
       startVinylSound(soundToPlay, card);
       return;
     }
 
-    // 4. Повторный клик ставит на паузу
+    // 6. Повторный клик плавно замедляет моторчик и ставит на паузу
     card.classList.remove("is-playing", "is-audio-on");
-    stopVinylSound();
+    stopVinylSound(true);
   });
 
   // Панель настроек в меню Extensions
@@ -791,6 +986,7 @@
         <div class="inline-drawer-content">
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_sound" ${s.sound ? "checked" : ""}><span>Включить звук при клике</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_autospin" ${s.autoSpin ? "checked" : ""}><span>Крутить пластинку сразу</span></label>
+          <label class="checkbox_label"><input type="checkbox" id="st_vinyl_mascot" ${s.cozyMascot !== false ? "checked" : ""}><span>🐾 Котик и чашка с паром на деке</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_compact" ${s.compactMode ? "checked" : ""}><span>Компактный режим (мини-плеер)</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_enabled" ${s.enabled ? "checked" : ""}><span>Авто-промпт для бота (необязательно)</span></label>
           <div style="margin-top:8px;">
@@ -821,12 +1017,19 @@
             </select>
           </div>
           <div id="st_vinyl_preview" style="margin-top:10px;">
-            [vinyl: Sweater Weather | The Neighbourhood | ${previewVibe} | Нажми на пластинку для звука, на плашку справа — чтобы сменить погоду, а на кружок «–» в углу — чтобы свернуть!]
+            [vinyl: Sweater Weather | The Neighbourhood | ${previewVibe} | Нажми на пластинку для звука, погладь котика на деке, а сердечком ♡ сохраняй треки в коллекцию!]
+          </div>
+          <div class="st-vinyl-shelf-box">
+            <div class="st-vinyl-shelf-header">
+              <span>💿 Моя коллекция пластинок (<span id="st_vinyl_shelf_count">0</span>)</span>
+            </div>
+            <div id="st_vinyl_shelf_list" class="st-vinyl-shelf-list"></div>
           </div>
         </div>
       </div>`;
     container.insertAdjacentHTML("beforeend", html);
     renderVinylInElement(document.getElementById("st_vinyl_preview"));
+    renderFavoritesShelf();
 
     const save = () => {
       const ctx = window.SillyTavern?.getContext?.();
@@ -836,8 +1039,9 @@
     };
 
     document.getElementById("st_vinyl_enabled")?.addEventListener("change", (e) => { s.enabled = e.target.checked; save(); });
-    document.getElementById("st_vinyl_sound")?.addEventListener("change", (e) => { s.sound = e.target.checked; if (!s.sound) stopVinylSound(); save(); });
+    document.getElementById("st_vinyl_sound")?.addEventListener("change", (e) => { s.sound = e.target.checked; if (!s.sound) stopVinylSound(false); save(); });
     document.getElementById("st_vinyl_autospin")?.addEventListener("change", (e) => { s.autoSpin = e.target.checked; save(); });
+    document.getElementById("st_vinyl_mascot")?.addEventListener("change", (e) => { s.cozyMascot = e.target.checked; save(); });
     document.getElementById("st_vinyl_compact")?.addEventListener("change", (e) => {
       s.compactMode = e.target.checked;
       document.querySelectorAll(".st-vinyl-card").forEach((c) => {

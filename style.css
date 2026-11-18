@@ -1,5 +1,5 @@
 /* ==========================================================================
-   💿 Cozy Vinyl Player — Hi-Fi & Atmospheric Edition
+   💿 Cozy Vinyl Player — Hi-Fi, Mascot & Atmospheric Edition
    ========================================================================== */
 
 @keyframes stVinylSpin {
@@ -72,6 +72,41 @@
   82%, 100% { transform: translateX(var(--st-marquee-shift, -32%)); }
 }
 
+/* Анимации котика, пара над чашкой и сердечка */
+@keyframes stCatBreathe {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  50% { transform: scaleY(1.06) scaleX(1.02); }
+}
+
+@keyframes stCatTailWag {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(18deg); }
+}
+
+@keyframes stCatZzz {
+  0% { opacity: 0; transform: translate(0, 2px) scale(0.7); }
+  45% { opacity: 0.85; }
+  100% { opacity: 0; transform: translate(5px, -11px) scale(1.05); }
+}
+
+@keyframes stCatLovePop {
+  0% { opacity: 0; transform: translate(-50%, 2px) scale(0.5); }
+  35% { opacity: 1; transform: translate(-50%, -8px) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -18px) scale(0.9); }
+}
+
+@keyframes stSteamRise {
+  0% { opacity: 0; transform: translateY(2px) translateX(0) scale(0.8); }
+  45% { opacity: 0.75; transform: translateY(-5px) translateX(-1.5px) scale(1); }
+  100% { opacity: 0; transform: translateY(-12px) translateX(2px) scale(1.15); }
+}
+
+@keyframes stFavPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
 /* --------------------------------------------------------------------------
    Базовая карточка и цветовые палитры (Темы)
    -------------------------------------------------------------------------- */
@@ -93,8 +128,8 @@
   align-items: center;
   gap: 14px;
   max-width: 445px;
-  margin: 12px auto;
-  padding: 13px 15px;
+  margin: 14px auto 12px;
+  padding: 14px 15px 13px;
   background: linear-gradient(135deg, var(--v-bg1) 0%, var(--v-bg2) 100%);
   border: 1.5px solid var(--v-border);
   border-radius: 20px;
@@ -334,7 +369,7 @@ body.st-vinyl-theme-neon .st-vinyl-card {
 .st-vinyl-firefly.f3 { top: 34%; right: 12%; animation-delay: 2.3s; }
 
 /* --------------------------------------------------------------------------
-   💿 Дека, пластинка с неподвижным бликом, тонарм и индикатор
+   💿 Дека, пластинка, котик-маскот, мини-чашка с паром, тонарм и индикатор
    -------------------------------------------------------------------------- */
 .st-vinyl-deck {
   position: relative;
@@ -377,13 +412,20 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   animation: stVinylSpin 5.5s linear infinite;
   animation-play-state: paused;
   position: relative;
+  transition: filter 0.3s ease;
 }
 
 .st-vinyl-card.is-playing .st-vinyl-disc {
   animation-play-state: running;
 }
 
-/* Мини-деталь на яблоке пластинки, чтобы вращение читалось глазом */
+/* Плавное замедление моторчика винила перед остановкой */
+.st-vinyl-card.is-stopping .st-vinyl-disc {
+  animation-duration: 14s;
+  animation-play-state: running;
+}
+
+/* Мини-деталь на яблоке пластинки */
 .st-vinyl-disc::before {
   content: "✦";
   position: absolute;
@@ -429,7 +471,6 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   z-index: 3;
 }
 
-/* Круглая база-шарнир тонарма */
 .st-vinyl-arm::before {
   content: "";
   position: absolute;
@@ -442,7 +483,6 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
-/* Трубка тонарма и картридж иголки */
 .st-vinyl-arm::after {
   content: "";
   position: absolute;
@@ -484,6 +524,119 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   box-shadow: 0 0 8px rgba(74, 222, 128, 0.85);
 }
 
+/* 🐾 Спящий/слушающий котик на крышке деки */
+.st-vinyl-cat {
+  position: absolute;
+  top: -11px;
+  left: 5px;
+  width: 28px;
+  height: 17px;
+  z-index: 6;
+  cursor: pointer;
+  color: var(--v-text);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  transition: transform 0.2s ease;
+}
+
+.st-vinyl-cat:hover {
+  transform: scale(1.08);
+}
+
+.st-vinyl-cat svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.st-vinyl-cat .st-cat-body {
+  fill: currentColor;
+  transform-origin: center bottom;
+  animation: stCatBreathe 3.2s ease-in-out infinite;
+}
+
+.st-vinyl-cat .st-cat-tail {
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  fill: none;
+  transform-origin: 6px 12px;
+}
+
+.st-vinyl-card.is-playing .st-vinyl-cat .st-cat-tail {
+  animation: stCatTailWag 1.8s ease-in-out infinite;
+}
+
+.st-cat-zzz {
+  position: absolute;
+  top: -7px;
+  right: -4px;
+  font-size: 7.5px;
+  font-weight: 800;
+  color: var(--v-sub);
+  opacity: 0;
+  pointer-events: none;
+  animation: stCatZzz 2.6s ease-in-out infinite;
+}
+
+.st-vinyl-card.is-playing .st-cat-zzz {
+  display: none;
+}
+
+.st-cat-heart {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  font-size: 10px;
+  color: #ff5d8f;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.st-vinyl-cat.is-purring .st-cat-heart {
+  animation: stCatLovePop 0.95s ease-out forwards;
+}
+
+/* ☕ Мини-чашка с тёплым паром в правом нижнем углу деки */
+.st-vinyl-cup {
+  position: absolute;
+  bottom: -4px;
+  right: -5px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--v-badge);
+  border: 1px solid var(--v-deck-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  line-height: 1;
+  z-index: 5;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.st-vinyl-steam {
+  position: absolute;
+  top: -5px;
+  width: 2px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--v-sub);
+  opacity: 0;
+  filter: blur(0.4px);
+  animation: stSteamRise 2.4s ease-in-out infinite;
+}
+
+.st-vinyl-steam.s1 { left: 6px; animation-delay: 0s; }
+.st-vinyl-steam.s2 { left: 11px; animation-delay: 1.1s; }
+
+body.st-vinyl-hide-mascot .st-vinyl-cat,
+body.st-vinyl-hide-mascot .st-vinyl-cup {
+  display: none !important;
+}
+
 /* Каскад вылетающих ноток */
 .st-vinyl-notes {
   position: absolute;
@@ -515,7 +668,7 @@ body.st-vinyl-theme-neon .st-vinyl-card {
 }
 
 /* --------------------------------------------------------------------------
-   📝 Правая часть карточки: Статус, Вайб, Бегущая строка, Волна и Цитата
+   📝 Правая часть карточки: Статус, Вайб, Избранное, Бегущая строка и Волна
    -------------------------------------------------------------------------- */
 .st-vinyl-info {
   position: relative;
@@ -532,7 +685,7 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   gap: 4px;
   font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.25px;
   color: var(--v-accent);
   margin-bottom: 4px;
   flex-wrap: nowrap;
@@ -574,7 +727,7 @@ body.st-vinyl-theme-neon .st-vinyl-card {
 .st-vinyl-actions {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -589,7 +742,7 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 145px;
+  max-width: 132px;
   transition: transform 0.15s ease, background 0.2s ease;
 }
 
@@ -597,7 +750,8 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   transform: scale(0.94);
 }
 
-/* Кнопка сворачивания в компактный режим (Mini-pill) */
+/* ❤️ Кнопка сохранения в коллекцию и кнопка компактного режима */
+.st-vinyl-fav-btn,
 .st-vinyl-mini-btn {
   display: inline-flex;
   align-items: center;
@@ -611,11 +765,19 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   font-size: 10px;
   line-height: 1;
   flex-shrink: 0;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
 }
 
+.st-vinyl-fav-btn:hover,
 .st-vinyl-mini-btn:hover {
   color: var(--v-text);
+}
+
+.st-vinyl-fav-btn.is-fav {
+  color: #ff4d7d;
+  border-color: rgba(255, 77, 125, 0.45);
+  background: rgba(255, 77, 125, 0.14);
+  animation: stFavPop 0.32s ease-out;
 }
 
 /* Заголовок и артист (с поддержкой плавной бегущей строки при переполнении) */
@@ -710,6 +872,8 @@ body.st-vinyl-theme-neon .st-vinyl-card {
 
 .st-vinyl-card.is-compact .st-vinyl-arm,
 .st-vinyl-card.is-compact .st-vinyl-led,
+.st-vinyl-card.is-compact .st-vinyl-cat,
+.st-vinyl-card.is-compact .st-vinyl-cup,
 .st-vinyl-card.is-compact .st-vinyl-wave,
 .st-vinyl-card.is-compact .st-vinyl-lyric {
   display: none;
@@ -726,3 +890,37 @@ body.st-vinyl-theme-neon .st-vinyl-card {
 .st-vinyl-card.is-compact .st-vinyl-artist {
   font-size: 10.5px;
 }
+
+/* --------------------------------------------------------------------------
+   📚 Полка избранных пластинок в настройках (.st-vinyl-shelf)
+   -------------------------------------------------------------------------- */
+.st-vinyl-shelf-box {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.st-vinyl-shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.st-vinyl-shelf-empty {
+  font-size: 11.5px;
+  opacity: 0.7;
+  text-align: center;
+  padding: 8px 4px;
+}
+
+.st-vinyl-shelf-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
