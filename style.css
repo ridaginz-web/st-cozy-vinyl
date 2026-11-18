@@ -1,138 +1,530 @@
+/* ==========================================================================
+   💿 Cozy Vinyl Player — Hi-Fi & Atmospheric Edition
+   ========================================================================== */
+
 @keyframes stVinylSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
 @keyframes stEqBounce {
-  0%, 100% { height: 3px; }
-  50% { height: 12px; }
-}
-@keyframes stNoteFloat {
-  0% { opacity: 0; transform: translateY(4px) scale(0.8); }
-  50% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-16px) translateX(6px) scale(1.15); }
+  0%, 100% { height: 3px; opacity: 0.65; }
+  50% { height: 12px; opacity: 1; }
 }
 
+@keyframes stNoteFloat1 {
+  0% { opacity: 0; transform: translate(0, 4px) scale(0.7) rotate(-10deg); }
+  35% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(-6px, -22px) scale(1.15) rotate(14deg); }
+}
+
+@keyframes stNoteFloat2 {
+  0% { opacity: 0; transform: translate(0, 6px) scale(0.65) rotate(8deg); }
+  40% { opacity: 0.85; }
+  100% { opacity: 0; transform: translate(9px, -24px) scale(1.1) rotate(-12deg); }
+}
+
+@keyframes stNoteFloat3 {
+  0% { opacity: 0; transform: translate(0, 4px) scale(0.6); }
+  45% { opacity: 0.8; }
+  100% { opacity: 0; transform: translate(2px, -26px) scale(1.05); }
+}
+
+@keyframes stArmBreathe {
+  0%, 100% { transform: rotate(22deg); }
+  50% { transform: rotate(23.2deg); }
+}
+
+@keyframes stRainFall {
+  0% { background-position: 0 0, 14px -18px; }
+  100% { background-position: -16px 48px, -2px 30px; }
+}
+
+@keyframes stStormFlash {
+  0%, 91%, 95%, 98%, 100% { opacity: 0; }
+  92.5% { opacity: 0.26; }
+  96% { opacity: 0.14; }
+}
+
+@keyframes stFireGlow {
+  0%, 100% { opacity: 0.55; transform: scaleY(1); }
+  50% { opacity: 0.9; transform: scaleY(1.15); }
+}
+
+@keyframes stEmberRise {
+  0% { opacity: 0; transform: translateY(10px) translateX(0) scale(0.6); }
+  30% { opacity: 0.95; }
+  100% { opacity: 0; transform: translateY(-38px) translateX(-8px) scale(1.1); }
+}
+
+@keyframes stFireflyFloat {
+  0%, 100% { opacity: 0.2; transform: translate(0, 0) scale(0.75); }
+  50% { opacity: 0.95; transform: translate(8px, -10px) scale(1.25); }
+}
+
+@keyframes stWaveFlow {
+  0% { background-position: 0 0; }
+  100% { background-position: 28px 0; }
+}
+
+@keyframes stMarqueeScroll {
+  0%, 18% { transform: translateX(0%); }
+  82%, 100% { transform: translateX(var(--st-marquee-shift, -32%)); }
+}
+
+/* --------------------------------------------------------------------------
+   Базовая карточка и цветовые палитры (Темы)
+   -------------------------------------------------------------------------- */
 .st-vinyl-card {
+  /* Тема по умолчанию: ☕ Тёплый латте */
   --v-bg1: #fff9f5;
-  --v-bg2: #f5e6d8;
-  --v-border: #e2cbb8;
-  --v-deck: #e8d3c1;
-  --v-accent: #d97b6c;
-  --v-text: #3d2a1d;
-  --v-sub: #856752;
-  --v-badge: #ebdacb;
+  --v-bg2: #f4e4d4;
+  --v-border: rgba(214, 182, 156, 0.85);
+  --v-deck: #e7d1be;
+  --v-deck-border: rgba(168, 132, 104, 0.28);
+  --v-accent: #d97564;
+  --v-accent-glow: rgba(217, 117, 100, 0.45);
+  --v-text: #3a271b;
+  --v-sub: #7f614c;
+  --v-badge: rgba(232, 212, 195, 0.88);
+  --v-shadow: 0 8px 24px rgba(45, 28, 15, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.65);
 
   display: flex;
   align-items: center;
   gap: 14px;
-  max-width: 430px;
-  margin: 10px auto;
-  padding: 12px 14px;
+  max-width: 445px;
+  margin: 12px auto;
+  padding: 13px 15px;
   background: linear-gradient(135deg, var(--v-bg1) 0%, var(--v-bg2) 100%);
   border: 1.5px solid var(--v-border);
-  border-radius: 18px;
-  box-shadow: 0 6px 16px rgba(40, 25, 15, 0.14);
+  border-radius: 20px;
+  box-shadow: var(--v-shadow);
   color: var(--v-text);
-  font-family: sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   cursor: pointer;
   user-select: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.24s ease, padding 0.22s ease;
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
+
 .st-vinyl-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(40, 25, 15, 0.2);
 }
 
-/* Цветовые темы */
+.st-vinyl-card:active {
+  transform: scale(0.99);
+}
+
+/* 🌸 Нежная сакура */
 body.st-vinyl-theme-pink .st-vinyl-card {
-  --v-bg1: #fff5f8; --v-bg2: #fce2eb; --v-border: #f3c4d5;
-  --v-deck: #f5d0de; --v-accent: #e06d94; --v-text: #4a2131;
-  --v-sub: #915a6e; --v-badge: #f7d6e2;
+  --v-bg1: #fff6f9;
+  --v-bg2: #fce1ec;
+  --v-border: rgba(240, 188, 208, 0.9);
+  --v-deck: #f5cfe0;
+  --v-deck-border: rgba(214, 134, 166, 0.3);
+  --v-accent: #e06590;
+  --v-accent-glow: rgba(224, 101, 144, 0.45);
+  --v-text: #482030;
+  --v-sub: #8f576c;
+  --v-badge: rgba(247, 211, 226, 0.88);
+  --v-shadow: 0 8px 24px rgba(85, 30, 55, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
+
+/* 🌙 Ночной Lo-Fi */
 body.st-vinyl-theme-dark .st-vinyl-card {
-  --v-bg1: #23202e; --v-bg2: #191622; --v-border: #3b354d;
-  --v-deck: #2d283b; --v-accent: #b589f7; --v-text: #f0ebfa;
-  --v-sub: #a398bd; --v-badge: #322c42;
+  --v-bg1: #252132;
+  --v-bg2: #181522;
+  --v-border: rgba(98, 86, 135, 0.48);
+  --v-deck: #2e2940;
+  --v-deck-border: rgba(181, 137, 247, 0.22);
+  --v-accent: #b88cf8;
+  --v-accent-glow: rgba(184, 140, 248, 0.5);
+  --v-text: #f2edfc;
+  --v-sub: #a69bc0;
+  --v-badge: rgba(56, 49, 77, 0.88);
+  --v-shadow: 0 10px 28px rgba(8, 6, 14, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
+
+/* 🍵 Уютная матча */
 body.st-vinyl-theme-matcha .st-vinyl-card {
-  --v-bg1: #f6faf4; --v-bg2: #e3efe0; --v-border: #c5dcc0;
-  --v-deck: #d4e6cf; --v-accent: #689f63; --v-text: #223820;
-  --v-sub: #5b7858; --v-badge: #d9ead5;
+  --v-bg1: #f6faf4;
+  --v-bg2: #e1efe0;
+  --v-border: rgba(182, 212, 176, 0.9);
+  --v-deck: #d1e5cc;
+  --v-deck-border: rgba(104, 159, 99, 0.26);
+  --v-accent: #5e9959;
+  --v-accent-glow: rgba(94, 153, 89, 0.42);
+  --v-text: #20361e;
+  --v-sub: #587655;
+  --v-badge: rgba(214, 233, 209, 0.88);
+  --v-shadow: 0 8px 24px rgba(25, 50, 25, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-.st-vinyl-deck {
-  position: relative;
-  width: 70px;
-  height: 70px;
-  flex-shrink: 0;
-  background: var(--v-deck);
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+/* 🧊 Liquid Glass (Матовое стекло под тёмный интерфейс) */
+body.st-vinyl-theme-glass .st-vinyl-card {
+  --v-bg1: rgba(34, 38, 52, 0.62);
+  --v-bg2: rgba(19, 22, 33, 0.78);
+  --v-border: rgba(255, 255, 255, 0.16);
+  --v-deck: rgba(255, 255, 255, 0.07);
+  --v-deck-border: rgba(255, 255, 255, 0.15);
+  --v-accent: #9ec5ff;
+  --v-accent-glow: rgba(158, 197, 255, 0.55);
+  --v-text: #f4f7ff;
+  --v-sub: #b4c0d9;
+  --v-badge: rgba(255, 255, 255, 0.11);
+  --v-shadow: 0 12px 32px rgba(0, 0, 0, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(16px) saturate(145%);
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
 }
 
-.st-vinyl-disc {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle, var(--v-bg1) 0 9%, var(--v-accent) 10% 34%, #1d1a18 35% 100%),
-    repeating-radial-gradient(circle, #1d1a18 0 2px, #2b2624 3px 4px);
-  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
-  animation: stVinylSpin 6s linear infinite;
+/* 🍷 Velvet Noir (Тёмный бархат и винтажное золото) */
+body.st-vinyl-theme-noir .st-vinyl-card {
+  --v-bg1: #28151b;
+  --v-bg2: #160c10;
+  --v-border: rgba(196, 142, 108, 0.36);
+  --v-deck: #331b22;
+  --v-deck-border: rgba(224, 172, 120, 0.25);
+  --v-accent: #e2a86b;
+  --v-accent-glow: rgba(226, 168, 107, 0.5);
+  --v-text: #faeee7;
+  --v-sub: #c29e94;
+  --v-badge: rgba(68, 34, 43, 0.88);
+  --v-shadow: 0 10px 28px rgba(10, 3, 5, 0.58), inset 0 1px 0 rgba(255, 225, 200, 0.1);
+}
+
+/* 📼 Retro Neon (Киберпанк / Ночной неон) */
+body.st-vinyl-theme-neon .st-vinyl-card {
+  --v-bg1: #191330;
+  --v-bg2: #0e0b1e;
+  --v-border: rgba(0, 240, 255, 0.35);
+  --v-deck: #231a42;
+  --v-deck-border: rgba(255, 77, 196, 0.35);
+  --v-accent: #ff55c8;
+  --v-accent-glow: rgba(255, 85, 200, 0.6);
+  --v-text: #f5f0ff;
+  --v-sub: #8fd9fb;
+  --v-badge: rgba(42, 29, 79, 0.9);
+  --v-shadow: 0 10px 28px rgba(6, 3, 18, 0.6), 0 0 16px rgba(255, 85, 200, 0.12), inset 0 1px 0 rgba(0, 240, 255, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   🌦️ Атмосферный слой эффектов внутри карточки (.st-vinyl-fx)
+   -------------------------------------------------------------------------- */
+.st-vinyl-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  opacity: 0.65;
+  transition: opacity 0.35s ease;
+}
+
+.st-vinyl-card.is-playing .st-vinyl-fx {
+  opacity: 1;
+}
+
+/* Эффект Дождя и Грозы */
+.st-vinyl-card[data-sound="rain"] .st-vinyl-fx::before,
+.st-vinyl-card[data-sound="storm"] .st-vinyl-fx::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  background-image:
+    radial-gradient(1px 9px at 18px 14px, rgba(160, 205, 255, 0.34), transparent),
+    radial-gradient(1px 11px at 46px 32px, rgba(160, 205, 255, 0.26), transparent),
+    radial-gradient(1px 8px at 78px 10px, rgba(160, 205, 255, 0.3), transparent);
+  background-size: 64px 48px;
+  transform: rotate(14deg);
+  animation: stRainFall 1.15s linear infinite;
   animation-play-state: paused;
-  position: relative;
 }
-.st-vinyl-card.is-playing .st-vinyl-disc {
+
+.st-vinyl-card.is-playing[data-sound="rain"] .st-vinyl-fx::before,
+.st-vinyl-card.is-playing[data-sound="storm"] .st-vinyl-fx::before {
   animation-play-state: running;
 }
-.st-vinyl-disc::after {
+
+/* Вспышки далёкой грозы */
+.st-vinyl-card[data-sound="storm"] .st-vinyl-fx::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(transparent 0deg, rgba(255,255,255,0.2) 40deg, transparent 80deg, transparent 180deg, rgba(255,255,255,0.2) 220deg, transparent 260deg);
+  background: radial-gradient(circle at 75% 20%, rgba(205, 225, 255, 0.85), transparent 70%);
+  opacity: 0;
+  animation: stStormFlash 6.5s ease-in-out infinite;
+  animation-play-state: paused;
 }
 
+.st-vinyl-card.is-playing[data-sound="storm"] .st-vinyl-fx::after {
+  animation-play-state: running;
+}
+
+/* Эффект Костра (тёплый отсвет снизу + всплывающие угольки) */
+.st-vinyl-card[data-sound="fire"] .st-vinyl-fx::before {
+  content: "";
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: -18px;
+  height: 55px;
+  background: radial-gradient(ellipse at center bottom, rgba(255, 118, 42, 0.32) 0%, rgba(255, 160, 64, 0.12) 48%, transparent 75%);
+  animation: stFireGlow 2.6s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.st-vinyl-card.is-playing[data-sound="fire"] .st-vinyl-fx::before {
+  animation-play-state: running;
+}
+
+.st-vinyl-ember {
+  display: none;
+  position: absolute;
+  bottom: 4px;
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: #ff9d42;
+  box-shadow: 0 0 6px #ff6a00;
+  opacity: 0;
+}
+
+.st-vinyl-card[data-sound="fire"] .st-vinyl-ember {
+  display: block;
+  animation: stEmberRise 2.8s ease-out infinite;
+  animation-play-state: paused;
+}
+
+.st-vinyl-card.is-playing[data-sound="fire"] .st-vinyl-ember {
+  animation-play-state: running;
+}
+
+.st-vinyl-ember.e1 { left: 16%; animation-delay: 0s; }
+.st-vinyl-ember.e2 { left: 48%; animation-delay: 0.9s; width: 3px; height: 3px; }
+.st-vinyl-ember.e3 { left: 78%; animation-delay: 1.7s; }
+
+/* Эффект Светлячков (нежные парящие огоньки боке) */
+.st-vinyl-firefly {
+  display: none;
+  position: absolute;
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background: #e6ff99;
+  box-shadow: 0 0 8px #b8ff66, 0 0 14px rgba(184, 255, 102, 0.6);
+  opacity: 0;
+}
+
+.st-vinyl-card[data-sound="fireflies"] .st-vinyl-firefly {
+  display: block;
+  animation: stFireflyFloat 3.6s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.st-vinyl-card.is-playing[data-sound="fireflies"] .st-vinyl-firefly {
+  animation-play-state: running;
+}
+
+.st-vinyl-firefly.f1 { top: 22%; left: 26%; animation-delay: 0s; }
+.st-vinyl-firefly.f2 { top: 68%; left: 62%; animation-delay: 1.2s; }
+.st-vinyl-firefly.f3 { top: 34%; right: 12%; animation-delay: 2.3s; }
+
+/* --------------------------------------------------------------------------
+   💿 Дека, пластинка с неподвижным бликом, тонарм и индикатор
+   -------------------------------------------------------------------------- */
+.st-vinyl-deck {
+  position: relative;
+  z-index: 1;
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  background: var(--v-deck);
+  border: 1px solid var(--v-deck-border);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.16),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: width 0.22s ease, height 0.22s ease;
+}
+
+/* Вращающийся виниловый диск с дорожками и центральным яблоком */
+.st-vinyl-disc {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle,
+      #d8d2cb 0 4%,
+      #221d1a 5% 8%,
+      var(--v-accent) 9% 31%,
+      #141210 32% 35%,
+      transparent 36% 100%
+    ),
+    repeating-radial-gradient(circle,
+      #161413 0 1.6px,
+      #262220 1.7px 3.2px
+    );
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.08);
+  animation: stVinylSpin 5.5s linear infinite;
+  animation-play-state: paused;
+  position: relative;
+}
+
+.st-vinyl-card.is-playing .st-vinyl-disc {
+  animation-play-state: running;
+}
+
+/* Мини-деталь на яблоке пластинки, чтобы вращение читалось глазом */
+.st-vinyl-disc::before {
+  content: "✦";
+  position: absolute;
+  top: 29%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 5.5px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+/* Неподвижный реалистичный световой блик поверх крутящегося диска */
+.st-vinyl-sheen {
+  position: absolute;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 25deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.22) 32deg,
+    transparent 65deg,
+    transparent 180deg,
+    rgba(255, 255, 255, 0.18) 212deg,
+    transparent 245deg
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Реалистичный Hi-Fi тонарм с поворотной базой и головкой звукоснимателя */
 .st-vinyl-arm {
   position: absolute;
   top: 6px;
-  right: 5px;
-  width: 16px;
-  height: 34px;
-  border-right: 2.5px solid #9e8472;
-  border-bottom: 3.5px solid var(--v-accent);
-  border-radius: 0 0 6px 0;
-  transform: rotate(-6deg);
-  transform-origin: top right;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  right: 6px;
+  width: 22px;
+  height: 44px;
+  transform: rotate(-4deg);
+  transform-origin: 16px 6px;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
+  z-index: 3;
 }
+
+/* Круглая база-шарнир тонарма */
+.st-vinyl-arm::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f0e6dc 0%, #9b8574 75%, #5e4f44 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* Трубка тонарма и картридж иголки */
+.st-vinyl-arm::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 4.5px;
+  width: 11px;
+  height: 31px;
+  border-right: 2.2px solid #cbbba8;
+  border-bottom: 4px solid var(--v-accent);
+  border-radius: 0 0 7px 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
 .st-vinyl-card.is-playing .st-vinyl-arm {
-  transform: rotate(20deg);
+  transform: rotate(22deg);
+  animation: stArmBreathe 3.2s ease-in-out infinite;
+}
+
+/* Светодиод питания и звука в левом нижнем углу деки */
+.st-vinyl-led {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 50%;
+  background: rgba(130, 120, 110, 0.45);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+  z-index: 3;
+}
+
+.st-vinyl-card.is-playing .st-vinyl-led {
+  background: var(--v-accent);
+  box-shadow: 0 0 6px var(--v-accent-glow);
+}
+
+.st-vinyl-card.is-audio-on .st-vinyl-led {
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.85);
+}
+
+/* Каскад вылетающих ноток */
+.st-vinyl-notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
 }
 
 .st-vinyl-note {
   position: absolute;
-  top: 2px;
-  left: 5px;
-  font-size: 13px;
   color: var(--v-accent);
   opacity: 0;
-  pointer-events: none;
-}
-.st-vinyl-card.is-playing .st-vinyl-note {
-  animation: stNoteFloat 2.4s ease-in-out infinite;
+  font-weight: 700;
+  text-shadow: 0 1px 4px var(--v-accent-glow);
 }
 
+.st-vinyl-note.n1 { top: 6px; left: 6px; font-size: 13px; }
+.st-vinyl-note.n2 { top: 12px; left: 18px; font-size: 10.5px; }
+.st-vinyl-note.n3 { top: 4px; left: 28px; font-size: 9px; }
+
+.st-vinyl-card.is-playing .st-vinyl-note.n1 {
+  animation: stNoteFloat1 2.5s ease-in-out infinite;
+}
+.st-vinyl-card.is-playing .st-vinyl-note.n2 {
+  animation: stNoteFloat2 2.8s ease-in-out infinite 0.85s;
+}
+.st-vinyl-card.is-playing .st-vinyl-note.n3 {
+  animation: stNoteFloat3 3.1s ease-in-out infinite 1.65s;
+}
+
+/* --------------------------------------------------------------------------
+   📝 Правая часть карточки: Статус, Вайб, Бегущая строка, Волна и Цитата
+   -------------------------------------------------------------------------- */
 .st-vinyl-info {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
   text-align: left;
 }
+
 .st-vinyl-top {
   display: flex;
   align-items: center;
@@ -140,67 +532,191 @@ body.st-vinyl-theme-matcha .st-vinyl-card {
   gap: 6px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.45px;
   color: var(--v-accent);
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
+
 .st-vinyl-status {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
 }
+
 .st-vinyl-eq {
   display: inline-flex;
   align-items: flex-end;
   gap: 2px;
   height: 12px;
 }
+
 .st-vinyl-eq span {
   width: 2.5px;
   height: 3px;
   background: var(--v-accent);
   border-radius: 2px;
 }
+
 .st-vinyl-card.is-playing .st-vinyl-eq span {
-  animation: stEqBounce 0.8s ease-in-out infinite;
+  animation: stEqBounce 0.78s ease-in-out infinite;
 }
-.st-vinyl-card.is-playing .st-vinyl-eq span:nth-child(2) { animation-delay: 0.2s; }
-.st-vinyl-card.is-playing .st-vinyl-eq span:nth-child(3) { animation-delay: 0.4s; }
+.st-vinyl-card.is-playing .st-vinyl-eq span:nth-child(2) { animation-delay: 0.18s; }
+.st-vinyl-card.is-playing .st-vinyl-eq span:nth-child(3) { animation-delay: 0.36s; }
+.st-vinyl-card.is-playing .st-vinyl-eq span:nth-child(4) { animation-delay: 0.52s; }
+
+.st-vinyl-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
 
 .st-vinyl-vibe {
   background: var(--v-badge);
   color: var(--v-text);
+  border: 1px solid var(--v-deck-border);
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 150px;
+  max-width: 155px;
+  transition: transform 0.15s ease, background 0.2s ease;
 }
+
+.st-vinyl-vibe:active {
+  transform: scale(0.94);
+}
+
+/* Кнопка сворачивания в компактный режим (Mini-pill) */
+.st-vinyl-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--v-badge);
+  border: 1px solid var(--v-deck-border);
+  color: var(--v-sub);
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.st-vinyl-mini-btn:hover {
+  color: var(--v-text);
+}
+
+/* Заголовок и артист (с поддержкой плавной бегущей строки при переполнении) */
+.st-vinyl-title-wrap,
+.st-vinyl-artist-wrap {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+
 .st-vinyl-title {
-  font-size: 14px;
+  display: inline-block;
+  font-size: 14.5px;
   font-weight: 800;
   color: var(--v-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   line-height: 1.25;
-}
-.st-vinyl-artist {
-  font-size: 11.5px;
-  color: var(--v-sub);
-  margin-bottom: 5px;
-  white-space: nowrap;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.st-vinyl-artist {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--v-sub);
+  line-height: 1.25;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.st-vinyl-title.is-marquee,
+.st-vinyl-artist.is-marquee {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  padding-right: 18px;
+  animation: stMarqueeScroll 8.5s ease-in-out infinite alternate;
+}
+
+/* Эстетичная звуковая дорожка (Waveform) между артистом и строчкой */
+.st-vinyl-wave {
+  height: 6px;
+  margin: 5px 0 5px;
+  width: 100%;
+  opacity: 0.48;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--v-accent) 0 2px,
+    transparent 2px 5px,
+    var(--v-sub) 5px 7px,
+    transparent 7px 10px
+  );
+  background-size: 28px 100%;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+}
+
+.st-vinyl-card.is-playing .st-vinyl-wave {
+  opacity: 0.78;
+  animation: stWaveFlow 1.6s linear infinite;
+}
+
 .st-vinyl-lyric {
   font-size: 11.5px;
   font-style: italic;
   color: var(--v-sub);
-  border-top: 1px dashed var(--v-border);
-  padding-top: 5px;
-  line-height: 1.35;
+  line-height: 1.38;
+}
+
+/* --------------------------------------------------------------------------
+   🤏 Компактный режим карточки (.is-compact)
+   -------------------------------------------------------------------------- */
+.st-vinyl-card.is-compact {
+  padding: 8px 12px;
+  gap: 10px;
+  border-radius: 999px;
+}
+
+.st-vinyl-card.is-compact .st-vinyl-deck {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+.st-vinyl-card.is-compact .st-vinyl-disc,
+.st-vinyl-card.is-compact .st-vinyl-sheen {
+  width: 38px;
+  height: 38px;
+}
+
+.st-vinyl-card.is-compact .st-vinyl-arm,
+.st-vinyl-card.is-compact .st-vinyl-led,
+.st-vinyl-card.is-compact .st-vinyl-wave,
+.st-vinyl-card.is-compact .st-vinyl-lyric {
+  display: none;
+}
+
+.st-vinyl-card.is-compact .st-vinyl-top {
+  margin-bottom: 1px;
+}
+
+.st-vinyl-card.is-compact .st-vinyl-title {
+  font-size: 13px;
+}
+
+.st-vinyl-card.is-compact .st-vinyl-artist {
+  font-size: 10.5px;
 }

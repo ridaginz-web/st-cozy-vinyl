@@ -11,7 +11,8 @@
     volume: 0.45,
     quietVolume: 0.3,
     autoSpin: true,
-    theme: "latte"
+    compactMode: false,
+    theme: "glass"
   };
 
   const SOUND_MODES = ["lofi", "rain", "storm", "fire", "fireflies"];
@@ -22,6 +23,15 @@
     fire: "🔥 Треск костра",
     fireflies: "✨ Светлячки"
   };
+
+  const THEME_CLASSES = [
+    "st-vinyl-theme-pink",
+    "st-vinyl-theme-dark",
+    "st-vinyl-theme-matcha",
+    "st-vinyl-theme-glass",
+    "st-vinyl-theme-noir",
+    "st-vinyl-theme-neon"
+  ];
 
   // Коллекция атмосферных пластинок и звуков под разные вайбы сцены
   const MOOD_TRACKS = [
@@ -152,8 +162,8 @@
 
   function applyTheme() {
     const { theme } = getSettings();
-    document.body.classList.remove("st-vinyl-theme-pink", "st-vinyl-theme-dark", "st-vinyl-theme-matcha");
-    if (theme !== "latte") {
+    document.body.classList.remove(...THEME_CLASSES);
+    if (theme && theme !== "latte") {
       document.body.classList.add(`st-vinyl-theme-${theme}`);
     }
   }
@@ -182,11 +192,9 @@
   function resolveCardSound(card) {
     const s = getSettings();
     if (!card) return s.soundMode && s.soundMode !== "auto" ? s.soundMode : "lofi";
-    // Если пользователь вручную переключил звук на самой карточке — уважаем его выбор
     if (card.dataset.manualSound) {
       return card.dataset.manualSound;
     }
-    // Если в настройках выбран конкретный звук (не "Авто"), используем его
     if (s.soundMode && s.soundMode !== "auto" && SOUND_MODES.includes(s.soundMode)) {
       return s.soundMode;
     }
@@ -199,14 +207,13 @@
     return card.dataset.sound || fromBadge || "lofi";
   }
 
-  // Атмосферный звуковой движок (с разблокировкой звука на iOS / Android и четкой слышимостью на динамике телефона)
+  // Атмосферный звуковой движок (с разблокировкой звука на iOS / Android и чёткой слышимостью на динамике телефона)
   let audioCtx = null;
   let stopAudioFn = null;
   let currentMasterGain = null;
   let activeAudioCard = null;
   let iosUnlockAudioEl = null;
 
-  // Крошечный валидный WAV-файл тишины для обхода рычажка беззвучного режима на iOS
   const SILENT_WAV_URI = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
   function unlockAudioEngine() {
@@ -236,7 +243,6 @@
       try { audioCtx.resume(); } catch (e) {}
     }
 
-    // Пустой импульс для мгновенного пробуждения WebAudio в мобильном браузере
     try {
       const buf = audioCtx.createBuffer(1, 1, 22050);
       const src = audioCtx.createBufferSource();
@@ -288,6 +294,9 @@
     const ctx = unlockAudioEngine();
     if (!ctx) return;
 
+    if (cardEl) {
+      cardEl.dataset.sound = mode;
+    }
     activeAudioCard = cardEl;
     syncCardVisualState();
 
@@ -295,7 +304,6 @@
     const timers = [];
     const sources = [];
 
-    // Мягкий компрессор защищает от перегруза на 100% и делает тихие звуки отчётливыми на телефоне
     const compressor = ctx.createDynamicsCompressor();
     compressor.threshold.value = -18;
     compressor.knee.value = 18;
@@ -326,7 +334,7 @@
       return src;
     };
 
-    // Мягкий ламповый щелчок опускания иглы при старте, чтобы пользователь сразу услышал отклик
+    // Мягкий ламповый щелчок опускания иглы при старте
     const playNeedleDrop = () => {
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
@@ -344,7 +352,6 @@
     playNeedleDrop();
 
     if (mode === "rain" || mode === "storm") {
-      // Отчётливый уютный шум дождя за окном
       const rainSrc = createNoiseSource((w, _, last) => (last + 0.12 * w) / 1.12);
       const filter = ctx.createBiquadFilter();
       filter.type = "bandpass";
@@ -359,7 +366,6 @@
       gain.connect(masterGain);
       rainSrc.start();
 
-      // Капли дождя по подоконнику
       const playDrop = () => {
         if (!active) return;
         const osc = ctx.createOscillator();
@@ -380,7 +386,6 @@
       playDrop();
       timers.push(setInterval(playDrop, 290));
 
-      // Глубокие раскаты грома для режима "storm" (слышны даже на динамике смартфона)
       if (mode === "storm") {
         const playThunder = () => {
           if (!active) return;
@@ -405,7 +410,6 @@
         timers.push(setInterval(playThunder, 6200));
       }
     } else if (mode === "fire") {
-      // Мягкое тёплое дыхание камина
       const warmth = createNoiseSource((w, _, last) => (last + 0.04 * w) / 1.04);
       const lowFilter = ctx.createBiquadFilter();
       lowFilter.type = "lowpass";
@@ -417,7 +421,6 @@
       warmGain.connect(masterGain);
       warmth.start();
 
-      // Живое потрескивание дров и угольков
       const crackleNoise = createNoiseSource((w) => w);
       crackleNoise.start();
 
@@ -447,7 +450,6 @@
         }, Math.ceil(duration * 1000) + 40);
       };
 
-      // Мгновенный первый треск при клике
       triggerCracklePop(1650, 0.024, 0.24, 2.2);
 
       const fireTimer = setInterval(() => {
@@ -470,7 +472,6 @@
       }, 155);
       timers.push(fireTimer);
     } else if (mode === "fireflies") {
-      // Тихий ночной воздух и нежные переливы светлячков
       const nightAir = createNoiseSource((w) => w * 0.04);
       const airFilter = ctx.createBiquadFilter();
       airFilter.type = "bandpass";
@@ -502,7 +503,6 @@
       playChime();
       timers.push(setInterval(playChime, 1250));
     } else {
-      // Режим Lo-Fi + уютный шорох виниловой пластинки и тёплые аккорды
       const vinylNoise = createNoiseSource((w) => w * (Math.random() > 0.992 ? 0.45 : 0.045));
       const filter = ctx.createBiquadFilter();
       filter.type = "bandpass";
@@ -563,7 +563,6 @@
     return str.replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
   }
 
-  // Очистка полей тега от возможной HTML-разметки, которую мог вставить парсер Markdown при регенерации
   function cleanTagField(str = "") {
     return String(str)
       .replace(/<[^>]*>/g, " ")
@@ -575,7 +574,6 @@
       .trim();
   }
 
-  // Поддерживает многострочные теги и любое форматирование внутри [vinyl: ... | ... | ...]
   const VINYL_REGEX = /\[vinyl:\s*([\s\S]+?)\s*\|\s*([\s\S]+?)\s*\|\s*([\s\S]+?)(?:\s*\|\s*([\s\S]+?))?\s*\]/gi;
 
   function buildVinylHtml(title, artist, vibe, lyric, sound = "") {
@@ -587,13 +585,21 @@
 
     const resolvedSound = sound || detectSoundMode(cleanVibe, `${cleanTitle} ${cleanLyric}`);
     const playClass = s.autoSpin ? "is-playing" : "";
+    const compactClass = s.compactMode ? "is-compact" : "";
     const statusText = s.autoSpin ? "NOW PLAYING" : "PAUSED";
     const t = escapeHtml(cleanTitle);
     const a = escapeHtml(cleanArtist);
     const v = escapeHtml(cleanVibe);
-    const l = cleanLyric ? `<div class="st-vinyl-lyric">«${escapeHtml(cleanLyric)}»</div>` : "";
 
-    return `<div class="st-vinyl-card ${playClass}" data-sound="${resolvedSound}" title="Нажми на пластинку для звука, или на плашку вайба справа — чтобы сменить звук"><div class="st-vinyl-deck"><div class="st-vinyl-disc"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-note">♪</div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-vibe" title="Нажми, чтобы переключить звук (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span></div><div class="st-vinyl-title">${t}</div><div class="st-vinyl-artist">${a}</div>${l}</div></div>`;
+    // Бегущая строка автоматически включается для длинных названий
+    const titleMarquee = cleanTitle.length > 26 ? "is-marquee" : "";
+    const artistMarquee = cleanArtist.length > 32 ? "is-marquee" : "";
+
+    const l = cleanLyric
+      ? `<div class="st-vinyl-wave"></div><div class="st-vinyl-lyric">«${escapeHtml(cleanLyric)}»</div>`
+      : "";
+
+    return `<div class="st-vinyl-card ${playClass} ${compactClass}" data-sound="${resolvedSound}" title="Нажми на пластинку для звука, на плашку вайба — для смены атмосферы, на кнопку [–] — чтобы свернуть"><div class="st-vinyl-fx"><span class="st-vinyl-ember e1"></span><span class="st-vinyl-ember e2"></span><span class="st-vinyl-ember e3"></span><span class="st-vinyl-firefly f1"></span><span class="st-vinyl-firefly f2"></span><span class="st-vinyl-firefly f3"></span></div><div class="st-vinyl-deck"><div class="st-vinyl-disc"></div><div class="st-vinyl-sheen"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-led"></div><div class="st-vinyl-notes"><span class="st-vinyl-note n1">♪</span><span class="st-vinyl-note n2">♫</span><span class="st-vinyl-note n3">✦</span></div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-actions"><span class="st-vinyl-vibe" title="Нажми, чтобы переключить атмосферу (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span><span class="st-vinyl-mini-btn" title="Свернуть / развернуть плеер">${s.compactMode ? "+" : "–"}</span></span></div><div class="st-vinyl-title-wrap"><div class="st-vinyl-title ${titleMarquee}">${t}</div></div><div class="st-vinyl-artist-wrap"><div class="st-vinyl-artist ${artistMarquee}">${a}</div></div>${l}</div></div>`;
   }
 
   function renderVinylInElement(el) {
@@ -612,7 +618,6 @@
       return true;
     }
 
-    // Резервный проход, если браузер или парсер разбил скобки по разным узлам
     VINYL_REGEX.lastIndex = 0;
     if (VINYL_REGEX.test(text)) {
       VINYL_REGEX.lastIndex = 0;
@@ -628,7 +633,6 @@
     return false;
   }
 
-  // Проверка реального стриминга по кнопке Стоп (без залипающих флагов при регенерации/свайпах)
   function isDomStreamingNow() {
     const stopBtn = document.getElementById("mes_stop");
     if (stopBtn && stopBtn.offsetParent !== null && getComputedStyle(stopBtn).display !== "none") {
@@ -655,14 +659,12 @@
 
         const isLastMessage = idx === allMessages.length - 1;
 
-        // 1. Если есть закрытый тег [vinyl: ... | ... | ...] — превращаем его в плеер СРАЗУ (даже при регенерации и свайпах!)
         if (renderVinylInElement(mesText) || mesText.querySelector(".st-vinyl-card")) {
           const autoMount = mes.querySelector(".st-vinyl-auto-mount");
           if (autoMount) autoMount.remove();
           return;
         }
 
-        // Если в тексте прямо сейчас печатается незакрытый [vinyl: — ждём закрывающей скобки
         const rawText = (mesText.innerText || "").trim();
         if (/\[vinyl:[^\]]*$/i.test(rawText)) {
           const autoMount = mes.querySelector(".st-vinyl-auto-mount");
@@ -670,14 +672,12 @@
           return;
         }
 
-        // Пока последнее сообщение ещё печатается — не вешаем авто-виджет, чтобы он не прыгал
         if (streaming && isLastMessage) {
           const autoMount = mes.querySelector(".st-vinyl-auto-mount");
           if (autoMount) autoMount.remove();
           return;
         }
 
-        // 2. Авто-виджет после завершения поста (если бот не написал тег [vinyl:...])
         const isUser = mes.getAttribute("is_user") === "true";
         const isSystem = mes.getAttribute("is_system") === "true";
         if (isUser || isSystem) return;
@@ -690,7 +690,6 @@
 
         if (rawText.length < 15) return;
 
-        // Учитываем и длину, и хеш текста + номер свайпа, чтобы при регенерации/свайпе (1/2 -> 2/2) карточка всегда обновлялась
         const swipeId = mes.getAttribute("swipeid") || "";
         const stateKey = `${rawText.length}:${hashText(rawText)}:${swipeId}`;
         if (mount && mount.dataset.stateKey === stateKey) return;
@@ -711,7 +710,6 @@
     }
   }
 
-  // Пробуждение аудио-движка на мобильных устройствах в момент касания карточки
   document.addEventListener("pointerdown", (e) => {
     if (e.target.closest && e.target.closest(".st-vinyl-card")) {
       unlockAudioEngine();
@@ -724,14 +722,23 @@
     }
   }, { passive: true });
 
-  // Клик по пластинке или смене звука
+  // Обработка кликов по плееру, плашке атмосферы и кнопке компактного режима
   document.addEventListener("click", (e) => {
     const card = e.target.closest?.(".st-vinyl-card");
     if (!card) return;
 
+    // 1. Кнопка сворачивания/разворачивания карточки [–] / [+]
+    const miniBtn = e.target.closest(".st-vinyl-mini-btn");
+    if (miniBtn) {
+      e.stopPropagation();
+      const compact = card.classList.toggle("is-compact");
+      miniBtn.textContent = compact ? "+" : "–";
+      return;
+    }
+
     const s = getSettings();
 
-    // Если нажали на плашку вайба справа сверху — переключаем звук по кругу!
+    // 2. Плашка вайба справа сверху — переключает звук И визуальный эффект карточки по кругу
     const vibeBadge = e.target.closest(".st-vinyl-vibe");
     if (vibeBadge) {
       e.stopPropagation();
@@ -749,7 +756,7 @@
 
     const soundToPlay = resolveCardSound(card);
 
-    // Если звук для этой карточки ещё не играет — первый клик по пластинке ВСЕГДА включает звук!
+    // 3. Первый клик по пластинке сразу запускает звук
     if (activeAudioCard !== card) {
       if (!s.sound) {
         s.sound = true;
@@ -761,7 +768,7 @@
       return;
     }
 
-    // Повторный клик по уже звучащей карточке ставит её на паузу
+    // 4. Повторный клик ставит на паузу
     card.classList.remove("is-playing", "is-audio-on");
     stopVinylSound();
   });
@@ -784,13 +791,14 @@
         <div class="inline-drawer-content">
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_sound" ${s.sound ? "checked" : ""}><span>Включить звук при клике</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_autospin" ${s.autoSpin ? "checked" : ""}><span>Крутить пластинку сразу</span></label>
+          <label class="checkbox_label"><input type="checkbox" id="st_vinyl_compact" ${s.compactMode ? "checked" : ""}><span>Компактный режим (мини-плеер)</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_enabled" ${s.enabled ? "checked" : ""}><span>Авто-промпт для бота (необязательно)</span></label>
           <div style="margin-top:8px;">
             <label for="st_vinyl_volume">Громкость звука: <span id="st_vinyl_vol_label">${Math.round((typeof s.quietVolume === "number" ? s.quietVolume : 0.3) * 100)}%</span></label>
             <input type="range" id="st_vinyl_volume" min="0.05" max="1" step="0.05" value="${typeof s.quietVolume === "number" ? s.quietVolume : 0.3}" style="width:100%;">
           </div>
           <div style="margin-top:8px;">
-            <label for="st_vinyl_sound_mode">Атмосферный звук:</label>
+            <label for="st_vinyl_sound_mode">Атмосферный звук и эффект:</label>
             <select id="st_vinyl_sound_mode" class="text_pole">
               <option value="auto" ${s.soundMode === "auto" ? "selected" : ""}>🪄 Авто под сцену (Дождь / Костёр / Светлячки / Lo-Fi)</option>
               <option value="lofi" ${s.soundMode === "lofi" ? "selected" : ""}>🎹 Lo-Fi и винил</option>
@@ -803,14 +811,17 @@
           <div style="margin-top:8px;">
             <label for="st_vinyl_theme">Тема плеера:</label>
             <select id="st_vinyl_theme" class="text_pole">
+              <option value="glass" ${s.theme === "glass" ? "selected" : ""}>🧊 Liquid Glass (Матовое стекло)</option>
+              <option value="noir" ${s.theme === "noir" ? "selected" : ""}>🍷 Velvet Noir (Тёмный бархат)</option>
+              <option value="neon" ${s.theme === "neon" ? "selected" : ""}>📼 Retro Neon (Ночной неон)</option>
+              <option value="dark" ${s.theme === "dark" ? "selected" : ""}>🌙 Ночной Lo-Fi</option>
               <option value="latte" ${s.theme === "latte" ? "selected" : ""}>☕ Тёплый латте</option>
               <option value="pink" ${s.theme === "pink" ? "selected" : ""}>🌸 Нежная сакура</option>
-              <option value="dark" ${s.theme === "dark" ? "selected" : ""}>🌙 Ночной Lo-Fi</option>
               <option value="matcha" ${s.theme === "matcha" ? "selected" : ""}>🍵 Уютная матча</option>
             </select>
           </div>
           <div id="st_vinyl_preview" style="margin-top:10px;">
-            [vinyl: Sweater Weather | The Neighbourhood | ${previewVibe} | Нажми на пластинку для звука, а на плашку справа сверху — чтобы переключить Дождь / Грозу / Костёр / Светлячков!]
+            [vinyl: Sweater Weather | The Neighbourhood | ${previewVibe} | Нажми на пластинку для звука, на плашку справа — чтобы сменить погоду, а на [–] — чтобы свернуть!]
           </div>
         </div>
       </div>`;
@@ -827,6 +838,15 @@
     document.getElementById("st_vinyl_enabled")?.addEventListener("change", (e) => { s.enabled = e.target.checked; save(); });
     document.getElementById("st_vinyl_sound")?.addEventListener("change", (e) => { s.sound = e.target.checked; if (!s.sound) stopVinylSound(); save(); });
     document.getElementById("st_vinyl_autospin")?.addEventListener("change", (e) => { s.autoSpin = e.target.checked; save(); });
+    document.getElementById("st_vinyl_compact")?.addEventListener("change", (e) => {
+      s.compactMode = e.target.checked;
+      document.querySelectorAll(".st-vinyl-card").forEach((c) => {
+        c.classList.toggle("is-compact", s.compactMode);
+        const btn = c.querySelector(".st-vinyl-mini-btn");
+        if (btn) btn.textContent = s.compactMode ? "+" : "–";
+      });
+      save();
+    });
     document.getElementById("st_vinyl_volume")?.addEventListener("input", (e) => {
       const val = parseFloat(e.target.value);
       s.quietVolume = isNaN(val) ? 0.3 : val;
@@ -838,7 +858,6 @@
     document.getElementById("st_vinyl_sound_mode")?.addEventListener("change", (e) => {
       s.soundMode = e.target.value;
       save();
-      // Сразу обновляем превью-карточку в настройках и активный звук
       const previewCard = document.querySelector("#st_vinyl_preview .st-vinyl-card");
       if (previewCard && s.soundMode !== "auto" && SOUND_NAMES[s.soundMode]) {
         delete previewCard.dataset.manualSound;
@@ -847,13 +866,13 @@
         if (badge) badge.textContent = SOUND_NAMES[s.soundMode];
       }
       if (activeAudioCard && s.soundMode !== "auto") {
+        activeAudioCard.dataset.sound = s.soundMode;
         startVinylSound(s.soundMode, activeAudioCard);
       }
     });
     document.getElementById("st_vinyl_theme")?.addEventListener("change", (e) => { s.theme = e.target.value; save(); });
   }
 
-  // Подписка на все события SillyTavern (включая регенерацию, свайпы 1/2 -> 2/2 и редактирование)
   let hooksRegistered = false;
   function registerTavernEvents() {
     if (hooksRegistered) return;
@@ -900,7 +919,6 @@
     registerTavernEvents();
     scanChat();
 
-    // Следим за изменениями текста внутри сообщений (чтобы ловить регенерацию и свайпы), игнорируя сам плеер
     const chat = document.getElementById("chat");
     if (chat && !chat.dataset.vinylObserved) {
       chat.dataset.vinylObserved = "1";
@@ -923,6 +941,5 @@
   }
   setTimeout(initVinylExtension, 800);
   setTimeout(initVinylExtension, 2500);
-  // Легкая фоновая проверка раз в 1.5 сек на случай нестандартной перерисовки при свайпе
   setInterval(scanChat, 1500);
 })();
