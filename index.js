@@ -154,7 +154,7 @@
 
   // Панель настроек в меню Extensions
   function mountSettingsUi() {
-    const container = document.getElementById("extensions_settings");
+    const container = document.getElementById("extensions_settings2") || document.getElementById("extensions_settings");
     if (!container || document.getElementById("st-vinyl-settings")) return;
 
     const s = getSettings();
@@ -177,9 +177,13 @@
               <option value="matcha" ${s.theme === "matcha" ? "selected" : ""}>🍵 Уютная матча</option>
             </select>
           </div>
+          <div id="st_vinyl_preview" style="margin-top:10px;">
+            [vinyl: Sweater Weather | The Neighbourhood | 🌧️ Тест плеера | Нажми на пластинку, чтобы проверить звук и тему]
+          </div>
         </div>
       </div>`;
     container.insertAdjacentHTML("beforeend", html);
+    renderVinylInElement(document.getElementById("st_vinyl_preview"));
 
     const save = () => {
       const ctx = window.SillyTavern?.getContext?.();
@@ -194,18 +198,25 @@
     document.getElementById("st_vinyl_theme")?.addEventListener("change", (e) => { s.theme = e.target.value; save(); });
   }
 
-  // Запуск и слежение за новыми сообщениями
-  window.addEventListener("load", () => {
-    setTimeout(() => {
-      applyTheme();
-      updatePrompt();
-      mountSettingsUi();
-      scanChat();
+  // Запуск сразу (SillyTavern подгружает расширения уже после события load)
+  function initVinylExtension() {
+    applyTheme();
+    updatePrompt();
+    mountSettingsUi();
+    scanChat();
 
-      const chat = document.getElementById("chat");
-      if (chat) {
-        new MutationObserver(() => scanChat()).observe(chat, { childList: true, subtree: true });
-      }
-    }, 1000);
-  });
+    const chat = document.getElementById("chat");
+    if (chat && !chat.dataset.vinylObserved) {
+      chat.dataset.vinylObserved = "1";
+      new MutationObserver(() => scanChat()).observe(chat, { childList: true, subtree: true });
+    }
+  }
+
+  if (window.jQuery) {
+    window.jQuery(() => initVinylExtension());
+  } else {
+    initVinylExtension();
+  }
+  setTimeout(initVinylExtension, 800);
+  setTimeout(initVinylExtension, 2500);
 })();
