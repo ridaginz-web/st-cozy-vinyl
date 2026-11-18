@@ -1,0 +1,206 @@
+@keyframes stVinylSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes stEqBounce {
+  0%, 100% { height: 3px; }
+  50% { height: 12px; }
+}
+@keyframes stNoteFloat {
+  0% { opacity: 0; transform: translateY(4px) scale(0.8); }
+  50% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-16px) translateX(6px) scale(1.15); }
+}
+
+.st-vinyl-card {
+  --v-bg1: #fff9f5;
+  --v-bg2: #f5e6d8;
+  --v-border: #e2cbb8;
+  --v-deck: #e8d3c1;
+  --v-accent: #d97b6c;
+  --v-text: #3d2a1d;
+  --v-sub: #856752;
+  --v-badge: #ebdacb;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 430px;
+  margin: 10px auto;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, var(--v-bg1) 0%, var(--v-bg2) 100%);
+  border: 1.5px solid var(--v-border);
+  border-radius: 18px;
+  box-shadow: 0 6px 16px rgba(40, 25, 15, 0.14);
+  color: var(--v-text);
+  font-family: sans-serif;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+.st-vinyl-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(40, 25, 15, 0.2);
+}
+
+/* Цветовые темы */
+body.st-vinyl-theme-pink .st-vinyl-card {
+  --v-bg1: #fff5f8; --v-bg2: #fce2eb; --v-border: #f3c4d5;
+  --v-deck: #f5d0de; --v-accent: #e06d94; --v-text: #4a2131;
+  --v-sub: #915a6e; --v-badge: #f7d6e2;
+}
+body.st-vinyl-theme-dark .st-vinyl-card {
+  --v-bg1: #23202e; --v-bg2: #191622; --v-border: #3b354d;
+  --v-deck: #2d283b; --v-accent: #b589f7; --v-text: #f0ebfa;
+  --v-sub: #a398bd; --v-badge: #322c42;
+}
+body.st-vinyl-theme-matcha .st-vinyl-card {
+  --v-bg1: #f6faf4; --v-bg2: #e3efe0; --v-border: #c5dcc0;
+  --v-deck: #d4e6cf; --v-accent: #689f63; --v-text: #223820;
+  --v-sub: #5b7858; --v-badge: #d9ead5;
+}
+
+.st-vinyl-deck {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  flex-shrink: 0;
+  background: var(--v-deck);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.st-vinyl-disc {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--v-bg1) 0 9%, var(--v-accent) 10% 34%, #1d1a18 35% 100%),
+    repeating-radial-gradient(circle, #1d1a18 0 2px, #2b2624 3px 4px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  animation: stVinylSpin 6s linear infinite;
+  animation-play-state: paused;
+  position: relative;
+}
+.st-vinyl-card.is-playing .st-vinyl-disc {
+  animation-play-state: running;
+}
+.st-vinyl-disc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(transparent 0deg, rgba(255,255,255,0.2) 40deg, transparent 80deg, transparent 180deg, rgba(255,255,255,0.2) 220deg, transparent 260deg);
+}
+
+.st-vinyl-arm {
+  position: absolute;
+  top: 6px;
+  right: 5px;
+  width: 16px;
+  height: 34px;
+  border-right: 2.5px solid #9e8472;
+  border-bottom: 3.5px solid var(--v-accent);
+  border-radius: 0 0 6px 0;
+  transform: rotate(-6deg);
+  transform-origin: top right;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+.st-vinyl-card.is-playing .st-vinyl-arm {
+  transform: rotate(20deg);
+}
+
+.st-vinyl-note {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  font-size: 13px;
+  color: var(--v-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.st-vinyl-card.is-playing .st-vinyl-note {
+  animation: stNoteFloat 2.4s ease-in-out infinite;
+}
+
+.st-vinyl-info {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.st-vinyl-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--v-accent);
+  margin-bottom: 3px;
+}
+.st-vinyl-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.st-vinyl-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+.st-vinyl-eq span {
+  width: 2.5px;
+  height: 3px;
+  background: var(--v-accent);
+  border-radius: 2px;
+}
+.st-vinyl-card.is-playing .st-vinyl-eq span {
+  animation: stEqBounce 0.8s ease-in-out infinite;
+}
+.st-vinyl-card.is-playing .st-vinyl-eq span:nth-child(2) { animation-delay: 0.2s; }
+.st-vinyl-card.is-playing .st-vinyl-eq span:nth-child(3) { animation-delay: 0.4s; }
+
+.st-vinyl-vibe {
+  background: var(--v-badge);
+  color: var(--v-text);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+.st-vinyl-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--v-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+.st-vinyl-artist {
+  font-size: 11.5px;
+  color: var(--v-sub);
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-vinyl-lyric {
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--v-sub);
+  border-top: 1px dashed var(--v-border);
+  padding-top: 5px;
+  line-height: 1.35;
+}
