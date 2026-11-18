@@ -529,19 +529,25 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  font-size: 10px;
+  gap: 4px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.45px;
+  letter-spacing: 0.3px;
   color: var(--v-accent);
   margin-bottom: 4px;
+  flex-wrap: nowrap;
 }
 
 .st-vinyl-status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-width: 0;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.st-vinyl-label {
+  white-space: nowrap;
 }
 
 .st-vinyl-eq {
@@ -576,14 +582,14 @@ body.st-vinyl-theme-neon .st-vinyl-card {
   background: var(--v-badge);
   color: var(--v-text);
   border: 1px solid var(--v-deck-border);
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 155px;
+  max-width: 145px;
   transition: transform 0.15s ease, background 0.2s ease;
 }
 

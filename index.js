@@ -574,7 +574,7 @@
       .trim();
   }
 
-  const VINYL_REGEX = /\[vinyl:\s*([\s\S]+?)\s*\|\s*([\s\S]+?)\s*\|\s*([\s\S]+?)(?:\s*\|\s*([\s\S]+?))?\s*\]/gi;
+  const VINYL_REGEX = /\[vinyl:\s*([^|\]]+?)\s*\|\s*([^|\]]+?)\s*\|\s*([^|\]]+?)(?:\s*\|\s*([\s\S]+?))?\s*\](?!\s*—)/gi;
 
   function buildVinylHtml(title, artist, vibe, lyric, sound = "") {
     const s = getSettings();
@@ -821,7 +821,7 @@
             </select>
           </div>
           <div id="st_vinyl_preview" style="margin-top:10px;">
-            [vinyl: Sweater Weather | The Neighbourhood | ${previewVibe} | Нажми на пластинку для звука, на плашку справа — чтобы сменить погоду, а на [–] — чтобы свернуть!]
+            [vinyl: Sweater Weather | The Neighbourhood | ${previewVibe} | Нажми на пластинку для звука, на плашку справа — чтобы сменить погоду, а на кружок «–» в углу — чтобы свернуть!]
           </div>
         </div>
       </div>`;
