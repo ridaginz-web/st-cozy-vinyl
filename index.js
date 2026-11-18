@@ -4,7 +4,7 @@
   const DEFAULT_PROMPT = `At the very end of every response, include a soundtrack widget matching the current scene's mood using this exact format:\n[vinyl: Song Title | Artist | Emoji + Short Vibe | A short fitting lyric line or poetic description of the scene's atmosphere in Russian]`;
 
   const defaultSettings = {
-    enabled: true,
+    enabled: false,
     autoWidget: true,
     sound: true,
     autoSpin: true,
@@ -224,6 +224,9 @@
 
   function renderVinylInElement(el) {
     if (!el || !el.innerHTML.includes("[vinyl:")) return;
+    VINYL_REGEX.lastIndex = 0;
+    if (!VINYL_REGEX.test(el.innerHTML)) return;
+    VINYL_REGEX.lastIndex = 0;
     el.innerHTML = el.innerHTML.replace(VINYL_REGEX, (_, title, artist, vibe, lyric) =>
       buildVinylHtml(title, artist, vibe, lyric)
     );
@@ -235,15 +238,16 @@
       const mesText = mes.querySelector(".mes_text");
       if (!mesText) return;
 
-      // 1. Если бот сам написал тег [vinyl: ...]
-      if (mesText.innerHTML.includes("[vinyl:")) {
+      // 1. Если есть полностью закрытый тег [vinyl: ... | ... | ...]
+      VINYL_REGEX.lastIndex = 0;
+      if (VINYL_REGEX.test(mesText.innerHTML)) {
         renderVinylInElement(mesText);
         const autoMount = mes.querySelector(".st-vinyl-auto-mount");
         if (autoMount) autoMount.remove();
         return;
       }
 
-      // 2. Авто-виджет под ответами персонажа в чате (даже без тега!)
+      // 2. Авто-виджет под ответами персонажа в чате
       const isUser = mes.getAttribute("is_user") === "true";
       const isSystem = mes.getAttribute("is_system") === "true";
       if (isUser || isSystem) return;
@@ -335,7 +339,13 @@
     document.getElementById("st_vinyl_theme")?.addEventListener("change", (e) => { s.theme = e.target.value; save(); });
   }
 
-  // Запуск сразу (SillyTavern подгружает расширения уже после события load)
+  // Запуск сразу + мягкий debounce, чтобы не нагружать Таверну во время генерации
+  let scanTimer = null;
+  function scheduleScan() {
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(scanChat, 350);
+  }
+
   function initVinylExtension() {
     applyTheme();
     updatePrompt();
@@ -345,7 +355,7 @@
     const chat = document.getElementById("chat");
     if (chat && !chat.dataset.vinylObserved) {
       chat.dataset.vinylObserved = "1";
-      new MutationObserver(() => scanChat()).observe(chat, { childList: true, subtree: true });
+      new MutationObserver(() => scheduleScan()).observe(chat, { childList: true, subtree: true });
     }
   }
 
