@@ -8,6 +8,8 @@
     autoWidget: true,
     sound: true,
     soundMode: "auto",
+    volume: 0.45,
+    quietVolume: 0.2,
     autoSpin: true,
     theme: "latte"
   };
@@ -156,32 +158,75 @@
     ctx.setExtensionPrompt(PROMPT_KEY, enabled ? DEFAULT_PROMPT : "", 1, 0);
   }
 
+  // Определение режима звука по тексту плашки вайба или контексту карточки
+  function detectSoundMode(vibeText = "", extraText = "") {
+    const v = String(vibeText).toLowerCase();
+    if (/гроз|гром|молн|шторм|буря|storm|thunder|⛈|⚡/.test(v)) return "storm";
+    if (/дожд|капл|ливень|пасмурн|туч|сыро|зонт|rain|🌧|☔/.test(v)) return "rain";
+    if (/кост[её]р|камин|ог[оня]|плам|искр|угол|дров|чай|кофе|какао|тепл|уют|fire|warm|cozy|🔥|☕/.test(v)) return "fire";
+    if (/светляч|ноч|лун|звезд|лес|сад|тишин|сон|спать|полноч|firefl|night|moon|✨|🌙|🌌/.test(v)) return "fireflies";
+    if (/lo-?fi|винил|пластинк|нежност|vinyl|🎹|💿/.test(v)) return "lofi";
+
+    const full = `${vibeText} ${extraText}`;
+    const matched = MOOD_TRACKS.find(g => g.re.test(full));
+    return matched ? matched.sound : "lofi";
+  }
+
+  function resolveCardSound(card) {
+    if (!card) return "lofi";
+    const badgeText = card.querySelector(".st-vinyl-vibe")?.textContent || "";
+    const fromBadge = detectSoundMode(badgeText);
+    if (fromBadge !== "lofi" || /lo-?fi|винил|🎹/i.test(badgeText)) {
+      card.dataset.sound = fromBadge;
+      return fromBadge;
+    }
+    return card.dataset.sound || fromBadge || "lofi";
+  }
+
   // Атмосферный звуковой движок: Lo-Fi, Дождь, Гроза, Костёр, Светлячки
   let audioCtx = null;
   let stopAudioFn = null;
+  let currentMasterGain = null;
+  let activeAudioCard = null;
+
+  function getMasterVolume() {
+    const s = getSettings();
+    const raw = typeof s.quietVolume === "number" ? s.quietVolume : 0.2;
+    return Math.max(0.02, Math.min(1, raw));
+  }
 
   function stopVinylSound() {
     if (stopAudioFn) {
       stopAudioFn();
       stopAudioFn = null;
     }
+    currentMasterGain = null;
+    activeAudioCard = null;
   }
 
-  function startVinylSound(cardSoundMode = "lofi") {
+  function startVinylSound(cardSoundMode = "lofi", cardEl = null) {
     stopVinylSound();
     const s = getSettings();
     if (!s.sound) return;
 
-    const mode = s.soundMode && s.soundMode !== "auto" ? s.soundMode : (cardSoundMode || "lofi");
+    // Всегда играем именно тот звук, который указан на карточке (например, 🔥 Треск костра)
+    const mode = cardSoundMode || (s.soundMode && s.soundMode !== "auto" ? s.soundMode : "lofi");
 
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     if (!audioCtx) audioCtx = new AudioContext();
     if (audioCtx.state === "suspended") audioCtx.resume();
 
+    activeAudioCard = cardEl;
     let active = true;
     const timers = [];
     const sources = [];
+
+    // Общий регулятор громкости (по умолчанию сделан в несколько раз тише и мягче)
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.value = getMasterVolume();
+    masterGain.connect(audioCtx.destination);
+    currentMasterGain = masterGain;
 
     const createNoiseSource = (typeFn) => {
       const bufferSize = audioCtx.sampleRate * 3;
@@ -201,105 +246,145 @@
     };
 
     if (mode === "rain" || mode === "storm") {
-      // Шум дождя по стеклу
+      // Мягкий шум дождя за окном
       const rainSrc = createNoiseSource((w, _, last) => (last + 0.08 * w) / 1.08);
       const filter = audioCtx.createBiquadFilter();
       filter.type = "bandpass";
-      filter.frequency.value = mode === "storm" ? 750 : 950;
+      filter.frequency.value = mode === "storm" ? 700 : 880;
       filter.Q.value = 0.7;
 
       const gain = audioCtx.createGain();
-      gain.gain.value = mode === "storm" ? 0.16 : 0.12;
+      gain.gain.value = mode === "storm" ? 0.055 : 0.04;
 
       rainSrc.connect(filter);
       filter.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(masterGain);
       rainSrc.start();
 
-      // Капли дождя
+      // Тихие капли дождя
       const dropTimer = setInterval(() => {
         if (!active) return;
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         osc.type = "sine";
-        const freq = 900 + Math.random() * 700;
+        const freq = 750 + Math.random() * 550;
         const now = audioCtx.currentTime;
         osc.frequency.setValueAtTime(freq, now);
-        osc.frequency.exponentialRampToValueAtTime(freq * 1.35, now + 0.04);
-        g.gain.setValueAtTime(0.001, now);
-        g.gain.exponentialRampToValueAtTime(0.015, now + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.25, now + 0.04);
+        g.gain.setValueAtTime(0.0005, now);
+        g.gain.exponentialRampToValueAtTime(0.005, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
         osc.connect(g);
-        g.connect(audioCtx.destination);
+        g.connect(masterGain);
         osc.start(now);
-        osc.stop(now + 0.1);
-      }, 350);
+        osc.stop(now + 0.09);
+      }, 380);
       timers.push(dropTimer);
 
-      // Далёкие раскаты грома для режима "storm"
+      // Приглушённые далёкие раскаты грома для режима "storm"
       if (mode === "storm") {
         const playThunder = () => {
           if (!active) return;
           const thSrc = createNoiseSource((w, _, last) => (last + 0.02 * w) / 1.02);
           const thFilter = audioCtx.createBiquadFilter();
           thFilter.type = "lowpass";
-          thFilter.frequency.value = 110;
+          thFilter.frequency.value = 105;
           const thGain = audioCtx.createGain();
           const now = audioCtx.currentTime;
-          thGain.gain.setValueAtTime(0.001, now);
-          thGain.gain.linearRampToValueAtTime(0.35, now + 0.4);
-          thGain.gain.exponentialRampToValueAtTime(0.12, now + 1.4);
-          thGain.gain.linearRampToValueAtTime(0.25, now + 1.9);
+          thGain.gain.setValueAtTime(0.0005, now);
+          thGain.gain.linearRampToValueAtTime(0.12, now + 0.45);
+          thGain.gain.exponentialRampToValueAtTime(0.04, now + 1.5);
+          thGain.gain.linearRampToValueAtTime(0.08, now + 2.0);
           thGain.gain.exponentialRampToValueAtTime(0.0001, now + 4.2);
           thSrc.connect(thFilter);
           thFilter.connect(thGain);
-          thGain.connect(audioCtx.destination);
+          thGain.connect(masterGain);
           thSrc.start(now);
           thSrc.stop(now + 4.3);
         };
         setTimeout(playThunder, 800);
-        timers.push(setInterval(playThunder, 6500));
+        timers.push(setInterval(playThunder, 6800));
       }
     } else if (mode === "fire") {
-      // Тёплый гул пламени + треск дров в костре/камине
-      const warmth = createNoiseSource((w, _, last) => (last + 0.03 * w) / 1.03);
+      // Мягкое тёплое дыхание пламени (без шипения винила)
+      const warmth = createNoiseSource((w, _, last) => (last + 0.025 * w) / 1.025);
       const lowFilter = audioCtx.createBiquadFilter();
       lowFilter.type = "lowpass";
-      lowFilter.frequency.value = 160;
+      lowFilter.frequency.value = 135;
       const warmGain = audioCtx.createGain();
-      warmGain.gain.value = 0.22;
+      warmGain.gain.value = 0.075;
       warmth.connect(lowFilter);
       lowFilter.connect(warmGain);
-      warmGain.connect(audioCtx.destination);
+      warmGain.connect(masterGain);
       warmth.start();
 
-      // Потрескивание угольков и искр
-      const crackle = createNoiseSource((w) => (Math.random() > 0.992 ? w * 0.9 : w * 0.01));
-      const bp = audioCtx.createBiquadFilter();
-      bp.type = "bandpass";
-      bp.frequency.value = 2200;
-      bp.Q.value = 1.2;
-      const cGain = audioCtx.createGain();
-      cGain.gain.value = 0.14;
-      crackle.connect(bp);
-      bp.connect(cGain);
-      cGain.connect(audioCtx.destination);
-      crackle.start();
+      // Настоящее потрескивание дров и угольков в костре (отдельные живые щелчки и искорки)
+      const crackleNoise = createNoiseSource((w) => w);
+      crackleNoise.start();
+
+      const triggerCracklePop = (freq, duration, peakGain, qVal = 2.2) => {
+        if (!active) return;
+        const now = audioCtx.currentTime;
+        const bp = audioCtx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = freq;
+        bp.Q.value = qVal;
+
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.linearRampToValueAtTime(peakGain, now + 0.003);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        crackleNoise.connect(bp);
+        bp.connect(g);
+        g.connect(masterGain);
+
+        setTimeout(() => {
+          try {
+            crackleNoise.disconnect(bp);
+            bp.disconnect();
+            g.disconnect();
+          } catch (e) {}
+        }, Math.ceil(duration * 1000) + 40);
+      };
+
+      const fireTimer = setInterval(() => {
+        if (!active) return;
+        // Одиночный сухой щелчок уголька
+        if (Math.random() < 0.72) {
+          const freq = 1400 + Math.random() * 1900;
+          const dur = 0.014 + Math.random() * 0.022;
+          const peak = 0.035 + Math.random() * 0.055;
+          triggerCracklePop(freq, dur, peak, 2.4);
+        }
+        // Двойной треск веточки
+        if (Math.random() < 0.32) {
+          setTimeout(() => {
+            if (!active) return;
+            triggerCracklePop(1800 + Math.random() * 1400, 0.012 + Math.random() * 0.015, 0.03 + Math.random() * 0.04, 2.8);
+          }, 35 + Math.random() * 65);
+        }
+        // Глухой мягкий хлопок полена
+        if (Math.random() < 0.2) {
+          triggerCracklePop(420 + Math.random() * 380, 0.035 + Math.random() * 0.03, 0.04 + Math.random() * 0.035, 1.5);
+        }
+      }, 170);
+      timers.push(fireTimer);
     } else if (mode === "fireflies") {
-      // Ночной лес, сверчки и волшебные переливы светлячков
-      const nightAir = createNoiseSource((w) => w * 0.015);
+      // Тихий ночной воздух и нежные переливы светлячков
+      const nightAir = createNoiseSource((w) => w * 0.012);
       const airFilter = audioCtx.createBiquadFilter();
       airFilter.type = "bandpass";
-      airFilter.frequency.value = 3800;
+      airFilter.frequency.value = 3400;
       airFilter.Q.value = 4;
       const airGain = audioCtx.createGain();
-      airGain.gain.value = 0.04;
+      airGain.gain.value = 0.012;
       nightAir.connect(airFilter);
       airFilter.connect(airGain);
-      airGain.connect(audioCtx.destination);
+      airGain.connect(masterGain);
       nightAir.start();
 
-      const chimeNotes = [523.25, 659.25, 783.99, 987.77, 1046.5, 1318.5];
+      const chimeNotes = [329.63, 392.00, 523.25, 659.25, 783.99, 987.77];
       const playChime = () => {
         if (!active) return;
         const osc = audioCtx.createOscillator();
@@ -307,27 +392,27 @@
         osc.type = "sine";
         osc.frequency.value = chimeNotes[Math.floor(Math.random() * chimeNotes.length)];
         const now = audioCtx.currentTime;
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.exponentialRampToValueAtTime(0.03, now + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+        gain.gain.setValueAtTime(0.0005, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.6);
         osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain.connect(masterGain);
         osc.start(now);
-        osc.stop(now + 2.9);
+        osc.stop(now + 2.7);
       };
       playChime();
-      timers.push(setInterval(playChime, 1300));
+      timers.push(setInterval(playChime, 1400));
     } else {
-      // Режим Lo-Fi + мягкий шорох виниловой пластинки
-      const vinylNoise = createNoiseSource((w) => w * (Math.random() > 0.995 ? 0.35 : 0.03));
+      // Режим Lo-Fi + мягкий тихий шорох виниловой пластинки
+      const vinylNoise = createNoiseSource((w) => w * (Math.random() > 0.995 ? 0.28 : 0.025));
       const filter = audioCtx.createBiquadFilter();
       filter.type = "bandpass";
-      filter.frequency.value = 1100;
+      filter.frequency.value = 1050;
       const noiseGain = audioCtx.createGain();
-      noiseGain.gain.value = 0.06;
+      noiseGain.gain.value = 0.018;
       vinylNoise.connect(filter);
       filter.connect(noiseGain);
-      noiseGain.connect(audioCtx.destination);
+      noiseGain.connect(masterGain);
       vinylNoise.start();
 
       const chords = [
@@ -349,13 +434,13 @@
           osc.frequency.value = freq;
           const lp = audioCtx.createBiquadFilter();
           lp.type = "lowpass";
-          lp.frequency.value = 650;
-          gain.gain.setValueAtTime(0.001, now + i * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.025, now + i * 0.12 + 0.15);
+          lp.frequency.value = 520;
+          gain.gain.setValueAtTime(0.0005, now + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.009, now + i * 0.12 + 0.16);
           gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
           osc.connect(lp);
           lp.connect(gain);
-          gain.connect(audioCtx.destination);
+          gain.connect(masterGain);
           osc.start(now + i * 0.12);
           osc.stop(now + 2.5);
         });
@@ -379,8 +464,9 @@
 
   const VINYL_REGEX = /\[vinyl:\s*([^|\]]+?)\s*\|\s*([^|\]]+?)\s*\|\s*([^|\]]+?)(?:\s*\|\s*([^\]]+?))?\s*\]/gi;
 
-  function buildVinylHtml(title, artist, vibe, lyric, sound = "lofi") {
+  function buildVinylHtml(title, artist, vibe, lyric, sound = "") {
     const { autoSpin } = getSettings();
+    const resolvedSound = sound || detectSoundMode(vibe, `${title} ${lyric || ""}`);
     const playClass = autoSpin ? "is-playing" : "";
     const statusText = autoSpin ? "NOW PLAYING" : "PAUSED";
     const t = escapeHtml(title.trim());
@@ -388,7 +474,7 @@
     const v = escapeHtml(vibe.trim());
     const l = lyric ? `<div class="st-vinyl-lyric">«${escapeHtml(lyric.trim())}»</div>` : "";
 
-    return `<div class="st-vinyl-card ${playClass}" data-sound="${sound}" title="Нажми на пластинку для звука, или на плашку вайба справа — чтобы сменить звук"><div class="st-vinyl-deck"><div class="st-vinyl-disc"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-note">♪</div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-vibe" title="Нажми, чтобы переключить звук (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span></div><div class="st-vinyl-title">${t}</div><div class="st-vinyl-artist">${a}</div>${l}</div></div>`;
+    return `<div class="st-vinyl-card ${playClass}" data-sound="${resolvedSound}" title="Нажми на пластинку для звука, или на плашку вайба справа — чтобы сменить звук"><div class="st-vinyl-deck"><div class="st-vinyl-disc"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-note">♪</div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-vibe" title="Нажми, чтобы переключить звук (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span></div><div class="st-vinyl-title">${t}</div><div class="st-vinyl-artist">${a}</div>${l}</div></div>`;
   }
 
   function renderVinylInElement(el) {
@@ -396,9 +482,10 @@
     VINYL_REGEX.lastIndex = 0;
     if (!VINYL_REGEX.test(el.innerHTML)) return;
     VINYL_REGEX.lastIndex = 0;
-    el.innerHTML = el.innerHTML.replace(VINYL_REGEX, (_, title, artist, vibe, lyric) =>
-      buildVinylHtml(title, artist, vibe, lyric, "lofi")
-    );
+    el.innerHTML = el.innerHTML.replace(VINYL_REGEX, (_, title, artist, vibe, lyric) => {
+      const detectedSound = detectSoundMode(vibe, `${title} ${lyric || ""}`);
+      return buildVinylHtml(title, artist, vibe, lyric, detectedSound);
+    });
   }
 
   // Строгая проверка: генерирует ли сейчас бот ответ
@@ -477,7 +564,7 @@
     const vibeBadge = e.target.closest(".st-vinyl-vibe");
     if (vibeBadge) {
       e.stopPropagation();
-      const current = card.dataset.sound || "lofi";
+      const current = resolveCardSound(card);
       const nextIdx = (SOUND_MODES.indexOf(current) + 1) % SOUND_MODES.length;
       const nextSound = SOUND_MODES[nextIdx];
       card.dataset.sound = nextSound;
@@ -485,7 +572,19 @@
       card.classList.add("is-playing");
       const label = card.querySelector(".st-vinyl-label");
       if (label) label.textContent = "NOW PLAYING";
-      startVinylSound(nextSound);
+      startVinylSound(nextSound, card);
+      return;
+    }
+
+    const soundToPlay = resolveCardSound(card);
+    const s = getSettings();
+
+    // Если карточка крутилась автоматически при появлении, но звук ещё не запущен — первый клик сразу включает звук!
+    if (s.sound && activeAudioCard !== card) {
+      card.classList.add("is-playing");
+      const label = card.querySelector(".st-vinyl-label");
+      if (label) label.textContent = "NOW PLAYING";
+      startVinylSound(soundToPlay, card);
       return;
     }
 
@@ -494,7 +593,7 @@
     if (label) label.textContent = isPlaying ? "NOW PLAYING" : "PAUSED";
 
     if (isPlaying) {
-      startVinylSound(card.dataset.sound || "lofi");
+      startVinylSound(soundToPlay, card);
     } else {
       stopVinylSound();
     }
@@ -516,6 +615,10 @@
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_sound" ${s.sound ? "checked" : ""}><span>Включить звук при клике</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_autospin" ${s.autoSpin ? "checked" : ""}><span>Крутить пластинку сразу</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_enabled" ${s.enabled ? "checked" : ""}><span>Авто-промпт для бота (необязательно)</span></label>
+          <div style="margin-top:8px;">
+            <label for="st_vinyl_volume">Громкость звука: <span id="st_vinyl_vol_label">${Math.round((typeof s.quietVolume === "number" ? s.quietVolume : 0.2) * 100)}%</span></label>
+            <input type="range" id="st_vinyl_volume" min="0.05" max="1" step="0.05" value="${typeof s.quietVolume === "number" ? s.quietVolume : 0.2}" style="width:100%;">
+          </div>
           <div style="margin-top:8px;">
             <label for="st_vinyl_sound_mode">Атмосферный звук:</label>
             <select id="st_vinyl_sound_mode" class="text_pole">
@@ -554,6 +657,14 @@
     document.getElementById("st_vinyl_enabled")?.addEventListener("change", (e) => { s.enabled = e.target.checked; save(); });
     document.getElementById("st_vinyl_sound")?.addEventListener("change", (e) => { s.sound = e.target.checked; if (!s.sound) stopVinylSound(); save(); });
     document.getElementById("st_vinyl_autospin")?.addEventListener("change", (e) => { s.autoSpin = e.target.checked; save(); });
+    document.getElementById("st_vinyl_volume")?.addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      s.quietVolume = isNaN(val) ? 0.2 : val;
+      const lbl = document.getElementById("st_vinyl_vol_label");
+      if (lbl) lbl.textContent = `${Math.round(s.quietVolume * 100)}%`;
+      if (currentMasterGain) currentMasterGain.gain.value = getMasterVolume();
+      save();
+    });
     document.getElementById("st_vinyl_sound_mode")?.addEventListener("change", (e) => { s.soundMode = e.target.value; save(); });
     document.getElementById("st_vinyl_theme")?.addEventListener("change", (e) => { s.theme = e.target.value; save(); });
   }
