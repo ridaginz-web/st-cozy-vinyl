@@ -4,6 +4,7 @@
   const DEFAULT_PROMPT = `At the very end of every response, include a soundtrack widget matching the current scene's mood using this exact format:\n[vinyl: Song Title | Artist | Emoji + Short Vibe | A short fitting lyric line or poetic description of the scene's atmosphere in Russian]`;
 
   const defaultSettings = {
+    pluginEnabled: true,
     enabled: false,
     autoWidget: true,
     sound: true,
@@ -190,6 +191,7 @@
       document.body.classList.add(`st-vinyl-theme-${s.theme}`);
     }
     document.body.classList.toggle("st-vinyl-hide-mascot", s.cozyMascot === false);
+    document.body.classList.toggle("st-vinyl-disabled", s.pluginEnabled === false);
 
     // Обновляем иконку напитка в чашке под выбранную тему
     const drinkIcon = THEME_DRINKS[s.theme] || "☕";
@@ -201,8 +203,8 @@
   function updatePrompt() {
     const ctx = window.SillyTavern?.getContext?.();
     if (!ctx?.setExtensionPrompt) return;
-    const { enabled } = getSettings();
-    ctx.setExtensionPrompt(PROMPT_KEY, enabled ? DEFAULT_PROMPT : "", 1, 0);
+    const { enabled, pluginEnabled } = getSettings();
+    ctx.setExtensionPrompt(PROMPT_KEY, pluginEnabled !== false && enabled ? DEFAULT_PROMPT : "", 1, 0);
   }
 
   function detectSoundMode(vibeText = "", extraText = "") {
@@ -371,7 +373,37 @@
     } catch (e) {}
   }
 
+  function syncPowerControlsUi() {
+    const s = getSettings();
+    const isOff = s.pluginEnabled === false;
+
+    const masterBtn = document.getElementById("st_vinyl_master_toggle");
+    const masterLbl = document.getElementById("st_vinyl_master_label");
+    if (masterBtn) {
+      masterBtn.classList.toggle("is-off", isOff);
+    }
+    if (masterLbl) {
+      masterLbl.textContent = isOff
+        ? "Расширение выключено — нажмите, чтобы включить"
+        : "Расширение включено (нажмите, чтобы выключить)";
+    }
+
+    const wandBtn = document.getElementById("st_vinyl_wand_toggle");
+    const wandLbl = document.getElementById("st_vinyl_wand_label");
+    const wandIcon = document.getElementById("st_vinyl_wand_icon");
+    if (wandLbl) {
+      wandLbl.textContent = isOff ? "Включить Cozy Vinyl" : "Выключить Cozy Vinyl";
+    }
+    if (wandIcon) {
+      wandIcon.style.color = isOff ? "#ff5c74" : "#4ade80";
+    }
+    if (wandBtn) {
+      wandBtn.classList.toggle("is-off", isOff);
+    }
+  }
+
   function syncCardVisualState() {
+    const isOff = getSettings().pluginEnabled === false;
     document.querySelectorAll(".st-vinyl-card").forEach((c) => {
       const label = c.querySelector(".st-vinyl-label");
       if (c === activeAudioCard) {
@@ -392,7 +424,16 @@
         favBtn.classList.toggle("is-fav", fav);
         favBtn.textContent = fav ? "♥" : "♡";
       }
+
+      // Синхронизируем кнопку выключения ⏻ на карточке
+      const powerBtn = c.querySelector(".st-vinyl-power-btn");
+      if (powerBtn) {
+        powerBtn.classList.toggle("is-off", isOff);
+        powerBtn.title = isOff ? "Включить расширение Cozy Vinyl" : "Выключить расширение Cozy Vinyl";
+      }
     });
+
+    syncPowerControlsUi();
   }
 
   function stopVinylSound(withSpinDown = false) {
@@ -686,6 +727,32 @@
     };
   }
 
+  function setPluginEnabled(nextState, notify = false) {
+    const s = getSettings();
+    s.pluginEnabled = Boolean(nextState);
+
+    if (!s.pluginEnabled) {
+      stopVinylSound(false);
+      document.querySelectorAll("#chat .st-vinyl-auto-mount").forEach((el) => el.remove());
+    }
+
+    applyTheme();
+    updatePrompt();
+    syncCardVisualState();
+
+    const ctx = window.SillyTavern?.getContext?.();
+    ctx?.saveSettingsDebounced?.();
+
+    if (s.pluginEnabled) {
+      scanChat();
+      if (notify && window.toastr?.success) {
+        window.toastr.success("Плеер Cozy Vinyl снова включён 🎵");
+      }
+    } else if (notify && window.toastr?.info) {
+      window.toastr.info("Плеер Cozy Vinyl выключен. Включить обратно можно в меню ✨ или в настройках расширения.");
+    }
+  }
+
   function escapeHtml(str = "") {
     return str.replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
   }
@@ -703,8 +770,9 @@
 
   const VINYL_REGEX = /\[vinyl:\s*([^|\]]+?)\s*\|\s*([^|\]]+?)\s*\|\s*([^|\]]+?)(?:\s*\|\s*([\s\S]+?))?\s*\](?!\s*—)/gi;
 
-  // SVG уютного котика на крышке виниловой деки
+  // SVG уютного котика на крышке виниловой деки и иконка выключения ⏻
   const CAT_SVG = `<svg viewBox="0 0 32 20" aria-hidden="true"><path class="st-cat-tail" d="M6 15 C2 14, 1 9, 4 7"/><g class="st-cat-body"><ellipse cx="15" cy="14" rx="8.5" ry="5"/><circle cx="23" cy="11" r="4.2"/><polygon points="20,8 21.2,3.5 23.8,7.2"/><polygon points="23.5,7.2 26.2,3.8 26.8,8.5"/></g></svg><span class="st-cat-zzz">zZz</span><span class="st-cat-heart">♥</span>`;
+  const POWER_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>`;
 
   function buildVinylHtml(title, artist, vibe, lyric, sound = "") {
     const s = getSettings();
@@ -719,6 +787,8 @@
     const statusText = s.autoSpin ? "NOW PLAYING" : "PAUSED";
     const fav = isTrackFavorited(cleanTitle, cleanArtist);
     const drinkIcon = THEME_DRINKS[s.theme] || "☕";
+    const isOff = s.pluginEnabled === false;
+    const powerTitle = isOff ? "Включить расширение Cozy Vinyl" : "Выключить расширение Cozy Vinyl";
 
     const t = escapeHtml(cleanTitle);
     const a = escapeHtml(cleanArtist);
@@ -732,7 +802,7 @@
       ? `<div class="st-vinyl-wave"></div><div class="st-vinyl-lyric">«${lEsc}»</div>`
       : "";
 
-    return `<div class="st-vinyl-card ${playClass} ${compactClass}" data-sound="${resolvedSound}" data-title="${t}" data-artist="${a}" data-vibe="${v}" data-lyric="${lEsc}" title="Нажми на пластинку для звука, на котика — чтобы погладить, на плашку вайба — для смены погоды"><div class="st-vinyl-fx"><span class="st-vinyl-ember e1"></span><span class="st-vinyl-ember e2"></span><span class="st-vinyl-ember e3"></span><span class="st-vinyl-firefly f1"></span><span class="st-vinyl-firefly f2"></span><span class="st-vinyl-firefly f3"></span></div><div class="st-vinyl-deck"><div class="st-vinyl-cat" title="Погладить котика">${CAT_SVG}</div><div class="st-vinyl-disc"></div><div class="st-vinyl-sheen"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-led"></div><div class="st-vinyl-cup"><span class="st-vinyl-steam s1"></span><span class="st-vinyl-steam s2"></span><span class="st-vinyl-cup-icon">${drinkIcon}</span></div><div class="st-vinyl-notes"><span class="st-vinyl-note n1">♪</span><span class="st-vinyl-note n2">♫</span><span class="st-vinyl-note n3">✦</span></div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-actions"><span class="st-vinyl-vibe" title="Нажми, чтобы переключить атмосферу (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span><span class="st-vinyl-fav-btn ${fav ? "is-fav" : ""}" title="Сохранить пластинку в коллекцию">${fav ? "♥" : "♡"}</span><span class="st-vinyl-mini-btn" title="Свернуть / развернуть плеер">${s.compactMode ? "+" : "–"}</span></span></div><div class="st-vinyl-title-wrap"><div class="st-vinyl-title ${titleMarquee}">${t}</div></div><div class="st-vinyl-artist-wrap"><div class="st-vinyl-artist ${artistMarquee}">${a}</div></div>${l}</div></div>`;
+    return `<div class="st-vinyl-card ${playClass} ${compactClass}" data-sound="${resolvedSound}" data-title="${t}" data-artist="${a}" data-vibe="${v}" data-lyric="${lEsc}" title="Нажми на пластинку для звука, на котика — чтобы погладить, на плашку вайба — для смены погоды"><div class="st-vinyl-fx"><span class="st-vinyl-ember e1"></span><span class="st-vinyl-ember e2"></span><span class="st-vinyl-ember e3"></span><span class="st-vinyl-firefly f1"></span><span class="st-vinyl-firefly f2"></span><span class="st-vinyl-firefly f3"></span></div><div class="st-vinyl-deck"><div class="st-vinyl-cat" title="Погладить котика">${CAT_SVG}</div><div class="st-vinyl-disc"></div><div class="st-vinyl-sheen"></div><div class="st-vinyl-arm"></div><div class="st-vinyl-led"></div><div class="st-vinyl-cup"><span class="st-vinyl-steam s1"></span><span class="st-vinyl-steam s2"></span><span class="st-vinyl-cup-icon">${drinkIcon}</span></div><div class="st-vinyl-notes"><span class="st-vinyl-note n1">♪</span><span class="st-vinyl-note n2">♫</span><span class="st-vinyl-note n3">✦</span></div></div><div class="st-vinyl-info"><div class="st-vinyl-top"><span class="st-vinyl-status"><span class="st-vinyl-eq"><span></span><span></span><span></span><span></span></span><span class="st-vinyl-label">${statusText}</span></span><span class="st-vinyl-actions"><span class="st-vinyl-vibe" title="Нажми, чтобы переключить атмосферу (Lo-Fi / Дождь / Гроза / Костёр / Светлячки)">${v}</span><span class="st-vinyl-fav-btn ${fav ? "is-fav" : ""}" title="Сохранить пластинку в коллекцию">${fav ? "♥" : "♡"}</span><span class="st-vinyl-mini-btn" title="Свернуть / развернуть плеер">${s.compactMode ? "+" : "–"}</span><span class="st-vinyl-power-btn ${isOff ? "is-off" : ""}" title="${powerTitle}">${POWER_SVG}</span></span></div><div class="st-vinyl-title-wrap"><div class="st-vinyl-title ${titleMarquee}">${t}</div></div><div class="st-vinyl-artist-wrap"><div class="st-vinyl-artist ${artistMarquee}">${a}</div></div>${l}</div></div>`;
   }
 
   function renderFavoritesShelf() {
@@ -821,11 +891,16 @@
 
   function scanChat() {
     if (isScanning) return;
+    const settings = getSettings();
+    if (settings.pluginEnabled === false) {
+      document.querySelectorAll("#chat .st-vinyl-auto-mount").forEach((el) => el.remove());
+      return;
+    }
+
     isScanning = true;
 
     try {
       const streaming = isDomStreamingNow();
-      const settings = getSettings();
       const allMessages = Array.from(document.querySelectorAll("#chat .mes"));
 
       allMessages.forEach((mes, idx) => {
@@ -886,21 +961,36 @@
   }
 
   document.addEventListener("pointerdown", (e) => {
-    if (e.target.closest && e.target.closest(".st-vinyl-card")) {
+    if (!e.target.closest) return;
+    if (e.target.closest(".st-vinyl-power-btn")) return;
+    if (e.target.closest(".st-vinyl-card")) {
       unlockAudioEngine();
     }
   }, { passive: true });
 
   document.addEventListener("touchend", (e) => {
-    if (e.target.closest && e.target.closest(".st-vinyl-card")) {
+    if (!e.target.closest) return;
+    if (e.target.closest(".st-vinyl-power-btn")) return;
+    if (e.target.closest(".st-vinyl-card")) {
       unlockAudioEngine();
     }
   }, { passive: true });
 
-  // Обработка кликов по котику, сердечку избранного, кнопке сворачивания, плашке вайба и пластинке
+  // Обработка кликов по кнопке выключения, котику, избранному, сворачиванию, вайбу и пластинке
   document.addEventListener("click", (e) => {
     const card = e.target.closest?.(".st-vinyl-card");
     if (!card) return;
+
+    // 0. Кнопка выключения / включения расширения (⏻) на карточке
+    const powerBtn = e.target.closest(".st-vinyl-power-btn");
+    if (powerBtn) {
+      e.stopPropagation();
+      const sNow = getSettings();
+      const isCurrentlyOn = sNow.pluginEnabled !== false;
+      const inChat = Boolean(card.closest("#chat"));
+      setPluginEnabled(inChat ? false : !isCurrentlyOn, true);
+      return;
+    }
 
     // 1. Погладить котика на деке -> мурчание и сердечко
     const catEl = e.target.closest(".st-vinyl-cat");
@@ -968,12 +1058,35 @@
     stopVinylSound(true);
   });
 
+  // Быстрый пункт включения/выключения в меню чата ✨ (#extensionsMenu)
+  function mountWandMenuButton() {
+    const menu = document.getElementById("extensionsMenu");
+    if (!menu || document.getElementById("st_vinyl_wand_toggle")) return;
+
+    const s = getSettings();
+    const isOff = s.pluginEnabled === false;
+    const item = document.createElement("div");
+    item.id = "st_vinyl_wand_toggle";
+    item.className = `list-group-item flex-container flexGap5 interactable ${isOff ? "is-off" : ""}`;
+    item.tabIndex = 0;
+    item.innerHTML = `
+      <div id="st_vinyl_wand_icon" class="fa-solid fa-power-off extensionsMenuExtensionButton" style="color:${isOff ? "#ff5c74" : "#4ade80"};"></div>
+      <span id="st_vinyl_wand_label">${isOff ? "Включить Cozy Vinyl" : "Выключить Cozy Vinyl"}</span>
+    `;
+    item.addEventListener("click", () => {
+      const cur = getSettings();
+      setPluginEnabled(cur.pluginEnabled === false, true);
+    });
+    menu.appendChild(item);
+  }
+
   // Панель настроек в меню Extensions
   function mountSettingsUi() {
     const container = document.getElementById("extensions_settings2") || document.getElementById("extensions_settings");
     if (!container || document.getElementById("st-vinyl-settings")) return;
 
     const s = getSettings();
+    const isOff = s.pluginEnabled === false;
     const previewMode = s.soundMode && s.soundMode !== "auto" && SOUND_NAMES[s.soundMode] ? s.soundMode : "rain";
     const previewVibe = SOUND_NAMES[previewMode] || "🌧️ Шум дождя";
 
@@ -984,6 +1097,10 @@
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
+          <button type="button" id="st_vinyl_master_toggle" class="st-vinyl-master-btn ${isOff ? "is-off" : ""}">
+            <span class="st-vinyl-master-icon">${POWER_SVG}</span>
+            <span id="st_vinyl_master_label">${isOff ? "Расширение выключено — нажмите, чтобы включить" : "Расширение включено (нажмите, чтобы выключить)"}</span>
+          </button>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_sound" ${s.sound ? "checked" : ""}><span>Включить звук при клике</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_autospin" ${s.autoSpin ? "checked" : ""}><span>Крутить пластинку сразу</span></label>
           <label class="checkbox_label"><input type="checkbox" id="st_vinyl_mascot" ${s.cozyMascot !== false ? "checked" : ""}><span>🐾 Котик и чашка с паром на деке</span></label>
@@ -1030,6 +1147,7 @@
     container.insertAdjacentHTML("beforeend", html);
     renderVinylInElement(document.getElementById("st_vinyl_preview"));
     renderFavoritesShelf();
+    syncCardVisualState();
 
     const save = () => {
       const ctx = window.SillyTavern?.getContext?.();
@@ -1038,6 +1156,9 @@
       updatePrompt();
     };
 
+    document.getElementById("st_vinyl_master_toggle")?.addEventListener("click", () => {
+      setPluginEnabled(getSettings().pluginEnabled === false, true);
+    });
     document.getElementById("st_vinyl_enabled")?.addEventListener("change", (e) => { s.enabled = e.target.checked; save(); });
     document.getElementById("st_vinyl_sound")?.addEventListener("change", (e) => { s.sound = e.target.checked; if (!s.sound) stopVinylSound(false); save(); });
     document.getElementById("st_vinyl_autospin")?.addEventListener("change", (e) => { s.autoSpin = e.target.checked; save(); });
@@ -1120,6 +1241,7 @@
     applyTheme();
     updatePrompt();
     mountSettingsUi();
+    mountWandMenuButton();
     registerTavernEvents();
     scanChat();
 
@@ -1127,6 +1249,7 @@
     if (chat && !chat.dataset.vinylObserved) {
       chat.dataset.vinylObserved = "1";
       new MutationObserver((mutations) => {
+        if (getSettings().pluginEnabled === false) return;
         const externalChange = mutations.some((m) => {
           const targetEl = m.target.nodeType === 1 ? m.target : m.target.parentElement;
           return targetEl && !targetEl.closest(".st-vinyl-card, .st-vinyl-auto-mount");
