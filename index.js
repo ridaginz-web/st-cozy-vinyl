@@ -847,35 +847,135 @@
     renderFavoritesShelf();
   }
 
+  // Защита для TavernHelper (JS-Slash-Runner), iframe-рендеров, скриптов и интерактивной вёрстки
+  const UNSAFE_SUBTREE_SELECTOR = "iframe, script, style, canvas, video, audio, object, embed, details, pre, code, textarea, .TH-render, [class*='TH-'], [id^='TH-']";
+  const SKIP_TEXT_PARENT_SELECTOR = "script, style, pre, code, textarea, iframe, noscript, svg, button, select, option, .st-vinyl-card, .st-vinyl-auto-mount, .TH-render, [class*='TH-'], [id^='TH-'], [hidden]";
+
+  function createVinylFragmentFromText(str) {
+    const frag = document.createDocumentFragment();
+    let lastIdx = 0;
+    let matched = false;
+    VINYL_REGEX.lastIndex = 0;
+    let m;
+    while ((m = VINYL_REGEX.exec(str)) !== null) {
+      matched = true;
+      if (m.index > lastIdx) {
+        frag.appendChild(document.createTextNode(str.slice(lastIdx, m.index)));
+      }
+      const [, title, artist, vibe, lyric] = m;
+      const detectedSound = detectSoundMode(cleanTagField(vibe), `${cleanTagField(title)} ${cleanTagField(lyric || "")}`);
+      const tpl = document.createElement("template");
+      tpl.innerHTML = buildVinylHtml(title, artist, vibe, lyric, detectedSound);
+      frag.appendChild(tpl.content);
+      lastIdx = m.index + m[0].length;
+    }
+    if (!matched) return null;
+    if (lastIdx < str.length) {
+      frag.appendChild(document.createTextNode(str.slice(lastIdx)));
+    }
+    return frag;
+  }
+
+  function extractInlineVinylData(str = "") {
+    VINYL_REGEX.lastIndex = 0;
+    const m = VINYL_REGEX.exec(str);
+    if (!m) return null;
+    const [, title, artist, vibe, lyric] = m;
+    const detectedSound = detectSoundMode(cleanTagField(vibe), `${cleanTagField(title)} ${cleanTagField(lyric || "")}`);
+    return { title, artist, vibe, lyric: lyric || "", sound: detectedSound };
+  }
+
+  // Безопасная замена тега [vinyl: ...] без перезаписи .mes_text.innerHTML (не перезагружает iframe TavernHelper)
   function renderVinylInElement(el) {
     if (!el) return false;
-    const html = el.innerHTML || "";
-    const text = el.textContent || "";
-    if (!/\[vinyl:/i.test(html) && !/\[vinyl:/i.test(text)) return false;
+    const fullText = el.textContent || "";
+    if (!/\[vinyl:/i.test(fullText)) return false;
 
-    VINYL_REGEX.lastIndex = 0;
-    if (VINYL_REGEX.test(html)) {
-      VINYL_REGEX.lastIndex = 0;
-      el.innerHTML = html.replace(VINYL_REGEX, (_, title, artist, vibe, lyric) => {
-        const detectedSound = detectSoundMode(cleanTagField(vibe), `${cleanTagField(title)} ${cleanTagField(lyric || "")}`);
-        return buildVinylHtml(title, artist, vibe, lyric, detectedSound);
-      });
-      return true;
+    // 1. Точечная замена только текстовых узлов (соседние iframe, скрипты и спойлеры вообще не затрагиваются)
+    const textNodes = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const p = node.parentElement;
+        if (!p || p.closest(SKIP_TEXT_PARENT_SELECTOR)) return NodeFilter.FILTER_REJECT;
+        if (!/\[vinyl:/i.test(node.nodeValue || "")) return NodeFilter.FILTER_SKIP;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let curNode;
+    while ((curNode = walker.nextNode())) {
+      textNodes.push(curNode);
     }
 
-    VINYL_REGEX.lastIndex = 0;
-    if (VINYL_REGEX.test(text)) {
+    let replacedAny = false;
+    for (const tNode of textNodes) {
+      const frag = createVinylFragmentFromText(tNode.nodeValue || "");
+      if (frag && tNode.parentNode) {
+        tNode.parentNode.replaceChild(frag, tNode);
+        replacedAny = true;
+      }
+    }
+    if (replacedAny) return true;
+
+    // 2. Резервный путь: если Markdown разбил тег курсивом (<em>) внутри отдельного безопасного абзаца без iframe/TH
+    const candidates = el.id === "st_vinyl_preview"
+      ? [el]
+      : Array.from(el.querySelectorAll("p, li, blockquote, div, span"));
+
+    for (const cand of candidates) {
+      if (cand.classList?.contains("mes_text")) continue;
+      if (cand.closest(".st-vinyl-card, .st-vinyl-auto-mount, .TH-render, [class*='TH-'], [id^='TH-']")) continue;
+      if (cand.matches?.(UNSAFE_SUBTREE_SELECTOR) || cand.querySelector?.(UNSAFE_SUBTREE_SELECTOR)) continue;
+
+      const cText = cand.textContent || "";
       VINYL_REGEX.lastIndex = 0;
-      const match = VINYL_REGEX.exec(text);
-      if (match) {
-        const [fullMatch, title, artist, vibe, lyric] = match;
-        const detectedSound = detectSoundMode(cleanTagField(vibe), `${cleanTagField(title)} ${cleanTagField(lyric || "")}`);
-        const cardHtml = buildVinylHtml(title, artist, vibe, lyric, detectedSound);
-        el.innerHTML = html.replace(escapeHtml(fullMatch), cardHtml);
+      if (!VINYL_REGEX.test(cText)) continue;
+
+      // Берём только самый глубокий контейнер с тегом, чтобы не трогать внешние обёртки
+      const hasDeeperMatch = Array.from(cand.querySelectorAll("p, li, blockquote, div")).some((child) => {
+        VINYL_REGEX.lastIndex = 0;
+        return VINYL_REGEX.test(child.textContent || "");
+      });
+      if (hasDeeperMatch) continue;
+
+      const cHtml = cand.innerHTML || "";
+      VINYL_REGEX.lastIndex = 0;
+      if (VINYL_REGEX.test(cHtml)) {
+        VINYL_REGEX.lastIndex = 0;
+        cand.innerHTML = cHtml.replace(VINYL_REGEX, (_, title, artist, vibe, lyric) => {
+          const detectedSound = detectSoundMode(cleanTagField(vibe), `${cleanTagField(title)} ${cleanTagField(lyric || "")}`);
+          return buildVinylHtml(title, artist, vibe, lyric, detectedSound);
+        });
         return true;
       }
     }
+
     return false;
+  }
+
+  function getCleanNarrativeText(rootEl) {
+    if (!rootEl) return "";
+    const parts = [];
+    const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const p = node.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        if (p.closest(SKIP_TEXT_PARENT_SELECTOR)) return NodeFilter.FILTER_REJECT;
+        const inlineStyle = p.getAttribute("style") || "";
+        if (/display\s*:\s*none/i.test(inlineStyle)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let n;
+    while ((n = walker.nextNode())) {
+      if (n.nodeValue) parts.push(n.nodeValue);
+    }
+    return parts.join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  function getEventElement(e) {
+    const t = e?.target;
+    if (!t) return null;
+    return t.nodeType === 1 ? t : t.parentElement || null;
   }
 
   function isDomStreamingNow() {
@@ -915,7 +1015,7 @@
           return;
         }
 
-        const rawText = (mesText.innerText || "").trim();
+        const rawText = getCleanNarrativeText(mesText);
         if (/\[vinyl:[^\]]*$/i.test(rawText)) {
           const autoMount = mes.querySelector(".st-vinyl-auto-mount");
           if (autoMount) autoMount.remove();
@@ -928,30 +1028,36 @@
           return;
         }
 
+        // Если тег [vinyl: ...] соседствовал напрямую с iframe без обёртки <p>, рендерим его безопасно снаружи .mes_text
+        const fallbackTagTrack = extractInlineVinylData(rawText);
+
         const isUser = mes.getAttribute("is_user") === "true";
         const isSystem = mes.getAttribute("is_system") === "true";
-        if (isUser || isSystem) return;
+        if (!fallbackTagTrack && (isUser || isSystem)) return;
 
         let mount = mes.querySelector(".st-vinyl-auto-mount");
-        if (settings.autoWidget === false) {
+        if (!fallbackTagTrack && settings.autoWidget === false) {
           if (mount) mount.remove();
           return;
         }
 
-        if (rawText.length < 15) return;
+        if (!fallbackTagTrack && rawText.length < 15) {
+          if (mount) mount.remove();
+          return;
+        }
 
         const swipeId = mes.getAttribute("swipeid") || "";
         const stateKey = `${rawText.length}:${hashText(rawText)}:${swipeId}`;
         if (mount && mount.dataset.stateKey === stateKey) return;
 
-        const auto = pickAutoTrack(rawText);
+        const trackData = fallbackTagTrack || pickAutoTrack(rawText);
         if (!mount) {
           mount = document.createElement("div");
           mount.className = "st-vinyl-auto-mount";
           mesText.insertAdjacentElement("afterend", mount);
         }
         mount.dataset.stateKey = stateKey;
-        mount.innerHTML = buildVinylHtml(auto.title, auto.artist, auto.vibe, auto.lyric, auto.sound);
+        mount.innerHTML = buildVinylHtml(trackData.title, trackData.artist, trackData.vibe, trackData.lyric, trackData.sound);
       });
 
       syncCardVisualState();
@@ -961,28 +1067,31 @@
   }
 
   document.addEventListener("pointerdown", (e) => {
-    if (!e.target.closest) return;
-    if (e.target.closest(".st-vinyl-power-btn")) return;
-    if (e.target.closest(".st-vinyl-card")) {
+    const targetEl = getEventElement(e);
+    if (!targetEl) return;
+    if (targetEl.closest(".st-vinyl-power-btn")) return;
+    if (targetEl.closest(".st-vinyl-card")) {
       unlockAudioEngine();
     }
   }, { passive: true });
 
   document.addEventListener("touchend", (e) => {
-    if (!e.target.closest) return;
-    if (e.target.closest(".st-vinyl-power-btn")) return;
-    if (e.target.closest(".st-vinyl-card")) {
+    const targetEl = getEventElement(e);
+    if (!targetEl) return;
+    if (targetEl.closest(".st-vinyl-power-btn")) return;
+    if (targetEl.closest(".st-vinyl-card")) {
       unlockAudioEngine();
     }
   }, { passive: true });
 
   // Обработка кликов по кнопке выключения, котику, избранному, сворачиванию, вайбу и пластинке
   document.addEventListener("click", (e) => {
-    const card = e.target.closest?.(".st-vinyl-card");
+    const targetEl = getEventElement(e);
+    const card = targetEl?.closest?.(".st-vinyl-card");
     if (!card) return;
 
     // 0. Кнопка выключения / включения расширения (⏻) на карточке
-    const powerBtn = e.target.closest(".st-vinyl-power-btn");
+    const powerBtn = targetEl.closest(".st-vinyl-power-btn");
     if (powerBtn) {
       e.stopPropagation();
       const sNow = getSettings();
@@ -993,7 +1102,7 @@
     }
 
     // 1. Погладить котика на деке -> мурчание и сердечко
-    const catEl = e.target.closest(".st-vinyl-cat");
+    const catEl = targetEl.closest(".st-vinyl-cat");
     if (catEl) {
       e.stopPropagation();
       catEl.classList.remove("is-purring");
@@ -1004,7 +1113,7 @@
     }
 
     // 2. Кнопка «В избранное» (♡ / ♥)
-    const favBtn = e.target.closest(".st-vinyl-fav-btn");
+    const favBtn = targetEl.closest(".st-vinyl-fav-btn");
     if (favBtn) {
       e.stopPropagation();
       toggleFavoriteFromCard(card);
@@ -1012,7 +1121,7 @@
     }
 
     // 3. Кнопка сворачивания/разворачивания карточки (– / +)
-    const miniBtn = e.target.closest(".st-vinyl-mini-btn");
+    const miniBtn = targetEl.closest(".st-vinyl-mini-btn");
     if (miniBtn) {
       e.stopPropagation();
       const compact = card.classList.toggle("is-compact");
@@ -1023,7 +1132,7 @@
     const s = getSettings();
 
     // 4. Плашка вайба справа сверху — переключает звук И визуальный эффект карточки по кругу
-    const vibeBadge = e.target.closest(".st-vinyl-vibe");
+    const vibeBadge = targetEl.closest(".st-vinyl-vibe");
     if (vibeBadge) {
       e.stopPropagation();
       const current = resolveCardSound(card);
@@ -1252,7 +1361,7 @@
         if (getSettings().pluginEnabled === false) return;
         const externalChange = mutations.some((m) => {
           const targetEl = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-          return targetEl && !targetEl.closest(".st-vinyl-card, .st-vinyl-auto-mount");
+          return targetEl && !targetEl.closest(".st-vinyl-card, .st-vinyl-auto-mount, .TH-render");
         });
         if (!externalChange) return;
         if (mutationTimer) clearTimeout(mutationTimer);
